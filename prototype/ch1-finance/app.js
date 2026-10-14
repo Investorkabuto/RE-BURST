@@ -44,7 +44,11 @@
     const s = g.s, v = s.v;
     $('date').textContent = ymLabel(Math.min(s.t, END));
     $('world').textContent = '世界 #' + s.seed;
-    let h = '<h2>国</h2>';
+    const x = s.ind;
+    let h = '<h2>主な指標</h2><div class="kpi">' +
+      [['成長率', sign(x.growth, '%')], ['財政収支', sign(x.balance, '兆円')], ['失業率', x.unemp.toFixed(1) + '%'], ['倒産', '月' + x.bankrupt.toLocaleString() + '件'], ['日経平均', x.nikkei.toLocaleString() + '円'], ['税収', x.tax.toFixed(0) + '兆円']]
+        .map(([k, val]) => '<div><span>' + k + '</span><b>' + val + '</b></div>').join('') + '</div>';
+    h += '<h2 class="sp">国</h2>';
     ['economy', 'fiscal', 'life', 'tech'].forEach(k => h += gaugeRow(NAMES[k], v[k], 'good'));
     h += '<h2 class="sp">党・自分</h2>';
     ['party', 'local', 'lead', 'image', 'scandal', 'tie'].forEach(k => h += gaugeRow(NAMES[k], v[k], k !== 'scandal' && k !== 'tie' ? 'good' : ''));
@@ -93,9 +97,35 @@
     $('legend').innerHTML = series.map(([, n, c]) => '<span style="color:' + c + '">' + n + '</span>').join('');
   }
 
+  // 3か月前と比べた向き
+  function trend(key, better) {
+    const h = g.s.hist; if (h.length < 4) return '';
+    const d = g.s.ind[key] - h[h.length - 4].ind[key];
+    const eps = key === 'nikkei' ? 300 : (key === 'bankrupt' ? 30 : 0.15);
+    if (Math.abs(d) < eps) return '<span class="tr">→</span>';
+    const good = (d > 0) === better;
+    return '<span class="tr ' + (good ? 'up' : 'down') + '">' + (d > 0 ? '↑' : '↓') + '</span>';
+  }
+  const sign = (x, u) => (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(1) + u;
+
+  // 国・国民・企業の事情：数字と、その立場の言い分（イベントが voices を持たなければ、数字から作る）
+  function situation(ev) {
+    const s = g.s, x = s.ind, v = s.v;
+    const vo = ev.voices ? ev.voices(s) : {};
+    const rows = [
+      ['国', '財政収支 ' + sign(x.balance, '兆円/年') + trend('balance', true) + '・税収 ' + x.tax.toFixed(0) + '兆円・成長率 ' + sign(x.growth, '%') + trend('growth', true),
+        vo.country || (x.balance <= -12 ? '国債の発行が膨らみ、大蔵省が増税か歳出削減を求めている。' : x.balance <= -9 ? '赤字が広がり始めている。' : '財政はまだ持ちこたえている。')],
+      ['国民', '失業率 ' + x.unemp.toFixed(1) + '%' + trend('unemp', false) + '・暮らしの実感 ' + Math.round(v.life),
+        vo.people || (v.life < 40 ? '暮らしの不安が広がり、街の空気が重い。' : x.unemp >= 3 ? '職を失う人が目に見えて増えた。' : '生活はまだ落ち着いている。')],
+      ['企業', '倒産 月' + x.bankrupt.toLocaleString() + '件' + trend('bankrupt', false) + '・日経平均 ' + x.nikkei.toLocaleString() + '円' + trend('nikkei', true),
+        vo.business || (x.bankrupt >= 1500 ? '連鎖倒産が地方に広がっている。' : x.bankrupt >= 1000 ? '中小企業の資金繰りが苦しくなっている。' : '設備投資の話が出ている。')]
+    ];
+    return '<div class="sit">' + rows.map(([k, num, say]) => '<div class="sr"><span class="sk">' + k + '</span><span><span class="sn">' + num + '</span><span class="sv">' + esc(say) + '</span></span></div>').join('') + '</div>';
+  }
+
   function showEvent(ev) {
     const cs = g.choices();
-    let h = '<h2>' + ymLabel(g.s.t) + '</h2><h3>' + esc(ev.title) + '</h3><p>' + esc(g.textOf(ev)) + '</p>';
+    let h = '<h2>' + ymLabel(g.s.t) + '</h2><h3>' + esc(ev.title) + '</h3><p>' + esc(g.textOf(ev)) + '</p>' + situation(ev);
     cs.forEach(c => {
       h += '<button class="ch" data-i="' + c.i + '"' + (c.block ? ' disabled' : '') + '>' + esc(c.label) +
         (c.note ? '<small>' + esc(c.note) + '</small>' : '') + (c.block ? '<small>選べない：' + esc(c.block) + '</small>' : '') + '</button>';

@@ -57,6 +57,7 @@
         // 国
         economy: 56,   // 景気
         fiscal: 60,    // 財政（高いほど健全）
+        spend: 0,      // 当初の予算を超えた歳出（兆円/年）。経済対策や投入で増え、少しずつ戻る
         life: 56,      // 暮らしの実感
         tech: 50,      // 技術力
         // 隠れた値（画面には出さない。予兆から読み取る）
@@ -85,6 +86,18 @@
     };
   }
 
+  // 実際の単位の指標（画面と文章に出す）。景気・傷み・連鎖・歳出から作る
+  function indicators(s) {
+    const v = s.v;
+    const growth = v.economy >= 45 ? (v.economy - 45) * 0.3 : (v.economy - 45) * 0.12; // 実質成長率（%）
+    const nikkei = Math.round((31000 - v.damage * 200 - (s.flags.crash ? 1500 : 0) + (v.economy - 56) * 40) / 10) * 10; // 日経平均（円）
+    const bankrupt = Math.round(800 + v.chain * 12 + Math.max(0, v.damage - 35) * 8 + Math.max(0, 50 - v.economy) * 10); // 企業倒産（件/月）
+    const unemp = 2.1 + Math.max(0, 56 - v.economy) * 0.03 + v.chain * 0.008; // 失業率（%）
+    const tax = 60 + (v.economy - 56) * 0.5;                     // 税収（兆円/年）
+    const balance = -(6.5 - (v.economy - 56) * 0.3 + v.spend);   // 単年度の財政収支（兆円/年。赤字は国債で埋める）
+    return { growth, nikkei, bankrupt, unemp, tax, balance };
+  }
+
   // 対策A：世論がまだ危機を感じていないうちに手を打つほど、反発が大きい（0〜1）
   function prematurity(s) { return clamp((45 - s.v.aware) / 45, 0, 1); }
   // 対策C：ドンが健在で、公的資金に反対している
@@ -96,11 +109,14 @@
     const rnd = makeRng(seed);
     const s = initialState(makeWorld(rnd));
     s.seed = seed;
+    s.ind = indicators(s);
     const omens = opts.omens || [];
     let pending = null;
 
     function log(msg, kind) { s.log.push({ t: s.t, msg, kind: kind || 'info' }); }
     function add(key, d) {
+      // 財政を傷める選択は、その分だけ単年度の歳出を増やす（増税や歳出削減は減らす）
+      if (key === 'fiscal') s.v.spend = d < 0 ? s.v.spend - d * 0.8 : Math.max(-6, s.v.spend - d * 0.8);
       s.v[key] += d;
       if (key === 'money' || key === 'gm') return;
       s.v[key] = clamp(s.v[key], 0, 100);
@@ -147,6 +163,7 @@
       const lt = 58 - v.damage * 0.15 - v.chain * 0.45 + (v.economy - 50) * 0.3;
       v.life = clamp(v.life + (lt - v.life) * 0.08, 0, 100);
       v.fiscal = clamp(v.fiscal - 0.08 - (v.economy < 45 ? 0.1 : 0) + (v.economy > 60 ? 0.05 : 0), 0, 100);
+      v.spend = v.spend * 0.97;
       v.backlash = v.backlash * 0.97;
       // 世論の危機認識は、本当の傷みより遅れて追いつく
       const at = clamp((v.damage - 30) * 1.3 + v.chain * 1.2 + (s.flags.crash ? 20 : 0), 0, 100);
@@ -166,7 +183,8 @@
       const lct = 52 + (v.economy - 50) * 0.5 + (v.party - 50) * 0.4;
       v.local = clamp(v.local + (lct - v.local) * 0.04, 0, 100);
       v.moral = v.moral * 0.99;
-      s.hist.push({ t: s.t, economy: v.economy, damage: v.damage, fiscal: v.fiscal, party: v.party, life: v.life, aware: v.aware });
+      s.ind = indicators(s);
+      s.hist.push({ t: s.t, economy: v.economy, damage: v.damage, fiscal: v.fiscal, party: v.party, life: v.life, aware: v.aware, ind: s.ind });
       omen();
     }
 
@@ -264,7 +282,7 @@
     return { s, tick, choices, choose, textOf, getPending: () => pending };
   }
 
-  const exported = { createGame, ymLabel, END, ELECTION, clamp, makeRng, prematurity, donBlocks };
+  const exported = { createGame, ymLabel, END, ELECTION, clamp, makeRng, prematurity, donBlocks, indicators };
   if (typeof module !== 'undefined' && module.exports) module.exports = exported;
   else root.REB = exported;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -11,6 +11,8 @@
     const n = base - (s.flags.fundBias ? 10 : 0) + (donBlocks(s) ? 10 : 0);
     return s.v.lead >= n ? null : '求心力が足りない（' + n + '以上が必要' + (donBlocks(s) ? '。ドンが反対している' : '') + '）';
   };
+  const tri = (x) => Math.abs(x).toFixed(1) + '兆円';
+  const bal = (s) => '単年度の赤字は年' + tri(s.ind.balance);
   const donNote = (s) => donBlocks(s) ? '／ドンの反対を押し切ることになる（ドンとの関係↓ 資金↓）' : '';
 
   const events = [
@@ -88,6 +90,11 @@
     {
       id: 'early', topic: 'bailout', title: '早期処理の機会（地銀再編と限定的な資本注入）', once: true, priority: 45,
       when: (s) => !s.flags.crash && !s.flags.mq2 && s.v.damage >= 35 && s.v.damage < 58 && s.t >= 6,
+      voices: (s) => ({
+        country: '大蔵省の若手：「今なら約2兆円で済みます。財政への影響は、赤字が年1.6兆円ほど増えるだけです」',
+        people: s.v.aware < 25 ? '街の声：「銀行が危ない？　景気はいいじゃないか。なんで税金を入れるんだ」' : '街の声：「うちのメインバンクは大丈夫なのか」',
+        business: '北陽銀行の頭取：「資本を入れていただけるなら……ただ、経営責任を問われるのは困ります」'
+      }),
       text: (s) => '大蔵省の若手が小声で言う。「今なら約2兆円と地銀の再編で、傷を小さいうちに塞げます。1年後には桁が変わります」。' +
         (s.v.aware < 25 ? 'ただ、世間はまだ危機を感じていない。今動けば「危機を煽る」と言われるだろう。' : '世間も、ようやく銀行の話をし始めている。'),
       choices: [
@@ -104,15 +111,48 @@
       ]
     },
     {
-      id: 'boom', title: '景気に余力が出た（国が伸びる局面）', once: true, priority: 20,
-      when: (s) => !s.flags.crash && s.t >= 10 && s.v.damage <= 34 && s.v.economy >= 53,
-      text: '金融の傷が浅く、景気にも余力がある。財界は設備投資を口にし、役所は「今なら打てる手が多い」と言う。',
+      id: 'boom', title: '景気の分かれ目（余力をどう使うか）', once: true, priority: 20,
+      when: (s) => !s.flags.crash && s.t >= 10 && s.v.damage <= 34,
+      text: (s) => {
+        let t = '金融の傷は浅く済んだ。株価の底割れも、銀行の連鎖倒産も起きていない。';
+        if (s.ind.growth < 2.5) t += 'しかし、金融不安の余波で企業は投資を手控え、景気の勢いは鈍っている。';
+        else t += '景気にはまだ勢いがあり、財界は設備投資を口にしている。';
+        if (s.ind.balance <= -9) t += 'その一方で、' + bal(s) + 'に広がった。大蔵省は、増税か歳出の削減を迫ってくる。';
+        return t + '何に使い、何を削るか。';
+      },
+      voices: (s) => ({
+        country: '大蔵省の主計局長：「' + (s.ind.balance <= -9 ? '国債の発行がかさんでいます。今のうちに財政を締めなければ、次の不況で打つ手がなくなります' : '財政に余裕があるうちに、将来の負担を減らしておくべきです') + '」',
+        people: s.ind.growth < 2.5 ? '商店街の会長：「お客さんの財布が固くなった。減税でもしてくれないと、年を越せない店が出る」' : '会社員：「ボーナスは出たが、家はもう買えない値段のままだ」',
+        business: '電機メーカーの社長：「半導体と液晶は今が勝負です。国が研究に金を付けてくれれば、10年先まで食える」'
+      }),
       choices: [
-        { label: '国内の技術と人材に重点投資する', note: '財政↓ 技術力↑↑／景気が遅れて伸びる',
-          effect: (g) => { g.add('fiscal', -3); g.add('tech', 8); g.s.flags.boom = true; g.later(10, '技術投資が実り、景気が伸びた', (h) => h.add('economy', 4)); } },
-        { label: '財政を立て直す', note: '財政↑ 景気↓（小）', effect: (g) => { g.add('fiscal', 6); g.add('economy', -1); g.s.flags.boom = true; } },
-        { label: '減税で暮らしを支える', note: '暮らし↑ 党の支持率↑ 財政↓',
-          effect: (g) => { g.add('life', 5); g.add('party', 3); g.add('fiscal', -4); g.s.flags.boom = true; } }
+        { label: '国内の技術と人材に重点投資する', note: '赤字 約+3.2兆円/年 技術力↑↑／10か月後に成長率 約+1.2%',
+          effect: (g) => { g.add('fiscal', -4); g.add('tech', 8); g.s.flags.boom = true; g.later(10, '技術投資が実り、景気が伸びた', (h) => h.add('economy', 4)); } },
+        { label: '増税して財政を立て直す（所得税・法人税）', note: '赤字 約−4.8兆円/年 成長率 約−0.6% 党の支持率↓ 暮らし↓',
+          effect: (g) => { g.add('fiscal', 6); g.add('economy', -2); g.add('party', -3); g.add('life', -2); g.s.flags.boom = true; g.s.flags.taxUp = true; } },
+        { label: '歳出を絞る（公共事業を削る）', note: '赤字 約−3.2兆円/年 地元の支持↓ 暮らし↓（小） 業界の献金↓',
+          effect: (g) => { g.add('fiscal', 4); g.add('local', -4); g.add('life', -2); g.add('economy', -1); g.add('funding', -5); g.s.flags.boom = true; g.s.flags.spendCut = true; } },
+        { label: '減税で暮らしを支える', note: '赤字 約+3.2兆円/年 暮らし↑ 党の支持率↑ 成長率 約+0.3%',
+          effect: (g) => { g.add('life', 5); g.add('party', 3); g.add('fiscal', -4); g.add('economy', 1); g.s.flags.boom = true; } }
+      ]
+    },
+    {
+      id: 'mofPress', title: '大蔵省の財政再建要求', cooldown: 9, priority: 35,
+      when: (s) => s.t >= 6 && s.ind.balance <= -12,
+      text: (s) => '大蔵省の主計局長が、資料を抱えて来る。「' + bal(s) + 'です。税収は年' + s.ind.tax.toFixed(0) + '兆円まで落ちました。このままでは、国債の利払いが予算を食い始めます」。' +
+        (s.ind.growth < 0 ? '景気は後退している。今締めれば、景気はさらに冷える。' : '景気はまだ持ちこたえている。'),
+      voices: (s) => ({
+        country: '主計局長：「増税か、歳出の削減か。どちらもしないなら、せめて来年度の予算で枠をはめさせてください」',
+        people: s.ind.unemp >= 2.8 ? '失業した元工員：「増税なんかされたら、本当に食えなくなる」' : '主婦：「税金が上がるなら、その分はちゃんと使い道を見せてほしい」',
+        business: s.ind.bankrupt >= 1100 ? '建設業協会：「公共事業を削られたら、地方の下請けから潰れます」' : '経済団体：「法人税を上げるなら、工場は海外に出ていくだけですよ」'
+      }),
+      choices: [
+        { label: '増税を受け入れる（所得税・法人税）', note: (s) => '赤字 約−4.8兆円/年 党の支持率↓' + (s.ind.growth < 0 ? ' 景気が悪い時の増税は効きすぎる（成長率 約−1.8%）' : ' 成長率 約−0.9%'),
+          effect: (g) => { const bad = g.s.ind.growth < 0; g.add('fiscal', 6); g.add('economy', bad ? -6 : -3); g.add('party', -4); g.add('life', -3); g.s.flags.taxUp = true; } },
+        { label: '歳出を絞る（公共事業を削る）', note: '赤字 約−3.2兆円/年 地元の支持↓ 業界の献金↓ 成長率 約−0.6%',
+          effect: (g) => { g.add('fiscal', 4); g.add('local', -5); g.add('economy', -2); g.add('life', -2); g.add('tie', -3); g.add('funding', -5); g.s.flags.spendCut = true; } },
+        { label: '突っぱね、国債で景気を支え続ける', hist: true, note: '赤字 約+1.6兆円/年 成長率 約+0.3%／次の要求はもっと厳しくなる',
+          effect: (g) => { g.add('fiscal', -2); g.add('economy', 1); g.s.flags.mofRefused = (g.s.flags.mofRefused || 0) + 1; } }
       ]
     },
 
@@ -120,6 +160,11 @@
     {
       id: 'crash', title: 'E1-10 株価の底割れと経済対策', once: true, priority: 60,
       when: (s) => !s.flags.crash && s.v.damage >= s.world.crashAt,
+      voices: (s) => ({
+        country: '主計局長：「経済対策を打てば、赤字はさらに年10兆円近く膨らみます」',
+        people: '会社員：「財形で買った株が半分になった。家のローンはそのままだ」',
+        business: s.ind.bankrupt >= 1000 ? '建設会社の社長：「手形が落ちない。公共事業を出してくれないと、年を越せない」' : '不動産会社の社長：「担保の土地が値下がりして、銀行が貸してくれない」'
+      }),
       text: '日経平均が急落する。市場は不良債権の処理が遅れていると見ている。新聞の一面が初めて「銀行」の二文字で埋まる。党は大型の経済対策を作る。',
       choices: [
         { label: '公共事業を中心にした大型の対策', hist: true, note: '景気↓（小）財政↓↓ 地元の支持↑',
@@ -133,6 +178,11 @@
     {
       id: 'mq2', topic: 'bailout', title: 'MQ-2 公的資金の早期投入論', cooldown: 1, priority: 58,
       when: (s) => s.flags.crash && !s.flags.mq2,
+      voices: (s) => ({
+        country: '大蔵省の銀行局長：「投入は前例がありません。銀行の自主的な処理に任せるべきです」',
+        people: '世論調査：「銀行に税金を使うことに反対」が7割',
+        business: s.ind.bankrupt >= 1100 ? '中小企業の団体：「貸し渋りで、黒字なのに潰れる会社が出ている。銀行を何とかしてくれ」' : '銀行協会：「公的資金を受ければ、経営責任を問われる。受けたくない」'
+      }),
       text: (s) => '総理が「金融機関に公的資金を入れてでも、不良債権を処理すべきだ」と発言するが、銀行業界、財界、大蔵省、世論がそろって反発する。規模を選ぶ。小さすぎれば止まらず、大きすぎれば財政と支持率が先に傷む。' +
         (donBlocks(s) ? '派閥の会合では、ドンが「銀行に税金を入れる話は、わしは聞いとらん」と釘を刺した。' : ''),
       choices: [
@@ -154,6 +204,11 @@
     {
       id: 'chain', topic: 'bailout', title: 'E1-18 連鎖倒産', cooldown: 4, priority: 55,
       when: (s) => s.v.chain >= 8 && s.inj.count === 0,
+      voices: (s) => ({
+        country: '主計局長：「破綻の処理には、預金保険の資金が足りません」',
+        people: '地元の工務店の妻：「主人の会社が、取引先の倒産に巻き込まれました」',
+        business: '商工会議所：「月' + s.ind.bankrupt + '件の倒産です。次はどこか、みんな怯えています」'
+      }),
       text: '弱い銀行が倒れると、その銀行から借りていた不動産会社が倒れ、下請けの建設会社や商店が倒れる。取引先の信用不安が次の銀行に飛び火する。頭取が青ざめて来る。「うちの取引先の4社が、同じ週に手形を落とせません」。',
       choices: [
         { label: '連鎖を止めるため、公的資金を入れる（約3兆円）', req: needFund(30), note: (s) => '今から入れる。遅れた分、傷みは深い' + donNote(s),
@@ -313,7 +368,7 @@
     },
     {
       id: 'nishinaLeaves', title: '仁科の辞表', once: true, priority: 64,
-      when: (s) => s.v.nishina <= 25,
+      when: (s) => s.v.nishina <= 30,
       text: '朝、机の上に仁科の辞表が置いてある。「お父上への御恩は、もう返し終えたと思っております」。地元の後援会長たちが、仁科の顔で集まっていたことを、あなたは知っている。',
       choices: [
         { label: '地元まで追いかけ、頭を下げて引き止める', note: '仁科の忠誠↑ 求心力↓（小）', req: (s) => s.v.money < 10 ? '金が足りない' : null,
