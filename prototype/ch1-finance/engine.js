@@ -68,7 +68,9 @@
         backlash: 0,   // 救済への批判
         funding: 100,  // 資金調達力（企業献金・パーティ収入の倍率）
         chain: 0,      // 連鎖倒産の勢い
-        moral: 0,      // モラルハザード（緩み）
+        moral: 0,      // 金融機関のモラルハザード（公的資金への甘え）
+        slack: 0,      // 緩み（党と自分の驕り。加点イベントの甘い選択で積み上がり、減点イベントの呼び水になる）
+        staff: 4,      // 人（秘書・スタッフの数）
         aware: 8,      // 世論の危機認識
         donScandal: 35,// ドンの疑惑（捜査と報道の進み具合）
         reform: 20,    // 政治改革を求める世論
@@ -113,7 +115,8 @@
     const salary = 460 + (v.economy - 56) * 1.5 + (v.life - 56) * 1.0; // 平均年収（万円）
     const takehome = salary * (1 - burden * 0.0065);              // 手取り（万円/年）。負担率が上がると減る
     const assets = Math.round(1700 + (nikkei - 31000) * 0.03 - (v.damage - 25) * 5 + yr * 30); // 家計の資産（兆円。株と土地の値段で動く）
-    return { growth, nikkei, bankrupt, unemp, tax, balance, cpi, pop, aging, tfr, births, ssec, burden, salary, takehome, assets };
+    const jgb = 3.8 + Math.max(0, 55 - v.fiscal) * 0.08 + Math.max(0, v.spend) * 0.05; // 国債金利（%）。財政が傷むほど上がる
+    return { growth, nikkei, bankrupt, unemp, tax, balance, cpi, jgb, pop, aging, tfr, births, ssec, burden, salary, takehome, assets };
   }
 
   // 語り部：大きな波乱のない月が続くほど、外からの衝撃が起きやすくなる（被害の大きさは備えで決まる）
@@ -197,7 +200,7 @@
       if (s.flags.e107) v.reform = clamp(v.reform + 0.6, 0, 100);
       v.reform = clamp(v.reform - 0.15, 0, 100);
       const scandalDrag = s.flags.e107 && s.don.status !== 'arrested' ? Math.max(0, v.donScandal - 50) * 0.08 : 0;
-      const pt = 50 + (v.economy - 50) * 0.35 - v.backlash * 0.25 - v.scandal * 0.1 - scandalDrag - Math.max(0, v.reform - 40) * 0.1;
+      const pt = 50 + (v.economy - 50) * 0.35 - v.backlash * 0.25 - v.scandal * 0.1 - scandalDrag - Math.max(0, v.reform - 40) * 0.1 - Math.max(0, v.slack - 40) * 0.1;
       v.party = clamp(v.party + (pt - v.party) * 0.06, 0, 100);
       const ft = 100 - v.backlash * 1.0 - Math.max(0, 50 - v.party) * 2.2 - v.scandal * 0.2 - (s.flags.donCut ? 12 : 0);
       v.funding = clamp(v.funding + (ft - v.funding) * 0.15, 0, 100);
@@ -207,6 +210,7 @@
       const lct = 52 + (v.economy - 50) * 0.5 + (v.party - 50) * 0.4;
       v.local = clamp(v.local + (lct - v.local) * 0.04, 0, 100);
       v.moral = v.moral * 0.99;
+      v.slack = v.slack * 0.995; // 緩みはなかなか引かない
       // 人口のゲージは、暮らしの実感に向かってごくゆっくり動く（効果は約20年かけて出る：L-2）
       v.birth = clamp(v.birth + (50 + (v.life - 56) * 0.3 - v.birth) * 0.01, 0, 100);
       s.ind = indicators(s);

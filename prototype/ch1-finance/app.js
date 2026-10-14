@@ -9,9 +9,9 @@
   const NAMES = {
     economy: '景気', fiscal: '財政', life: '暮らしの実感', tech: '技術力',
     party: '党の支持率', local: '地元の支持', lead: '求心力', scandal: 'スキャンダル', tie: 'しがらみ', image: '改革派の評価',
-    donRel: 'ドンとの関係', nishina: '仁科の忠誠'
+    donRel: 'ドンとの関係', nishina: '仁科の忠誠', slack: '緩み'
   };
-  const HIDDEN = { damage: '金融の傷み', chain: '連鎖倒産の勢い', aware: '世論の危機認識', backlash: '救済への批判', funding: '資金調達力', moral: 'モラルハザード', donScandal: 'ドンの疑惑', reform: '政治改革の世論', infl: '物価の圧力', bousai: '防災力' };
+  const HIDDEN = { damage: '金融の傷み', chain: '連鎖倒産の勢い', aware: '世論の危機認識', backlash: '救済への批判', funding: '資金調達力', moral: '金融のモラルハザード', donScandal: 'ドンの疑惑', reform: '政治改革の世論', infl: '物価の圧力', bousai: '防災力' };
   const SERIES = [['economy', '景気', 'var(--s1)'], ['fiscal', '財政', 'var(--s3)'], ['party', '党の支持率', 'var(--s4)'], ['life', '暮らしの実感', 'var(--s2)']];
   const DEBUG_SERIES = [['damage', '金融の傷み（内部）', 'var(--s5)'], ['aware', '世論の危機認識（内部）', 'var(--sub)']];
   const DON_STATUS = { active: '健在', resigned: '議員辞職', arrested: '逮捕', shadow: '院政' };
@@ -52,6 +52,8 @@
     ['economy', 'fiscal', 'life', 'tech'].forEach(k => h += gaugeRow(NAMES[k], v[k], 'good'));
     h += '<h2 class="sp">党・自分</h2>';
     ['party', 'local', 'lead', 'image', 'scandal', 'tie'].forEach(k => h += gaugeRow(NAMES[k], v[k], k !== 'scandal' && k !== 'tie' ? 'good' : ''));
+    h += gaugeRow(NAMES.slack, v.slack, '');
+    h += '<div class="g"><span>人（スタッフ）</span><div></div><b>' + Math.round(v.staff) + '人</b></div>';
     h += '<div class="g"><span>金（億円）</span><div></div><b>' + Math.round(v.money) + '</b></div>';
     h += '<div class="g"><span>乖離度</span><div class="bar"><i style="width:' + Math.min(100, s.div) + '%"></i></div><b>' + Math.round(s.div) + '</b></div>';
     h += '<h2 class="sp">人</h2>';
@@ -113,7 +115,7 @@
     const s = g.s, x = s.ind, v = s.v;
     const vo = ev.voices ? ev.voices(s) : {};
     const rows = [
-      ['国', '財政収支 ' + sign(x.balance, '兆円/年') + trend('balance', true) + '・税収 ' + x.tax.toFixed(0) + '兆円・成長率 ' + sign(x.growth, '%') + trend('growth', true) + '・社会保障費 ' + x.ssec.toFixed(0) + '兆円' + trend('ssec', false) + '・国民負担率 ' + x.burden.toFixed(1) + '%',
+      ['国', '財政収支 ' + sign(x.balance, '兆円/年') + trend('balance', true) + '・税収 ' + x.tax.toFixed(0) + '兆円・国債金利 ' + x.jgb.toFixed(1) + '%・成長率 ' + sign(x.growth, '%') + trend('growth', true) + '・社会保障費 ' + x.ssec.toFixed(0) + '兆円' + trend('ssec', false) + '・国民負担率 ' + x.burden.toFixed(1) + '%',
         vo.country || (x.balance <= -12 ? '国債の発行が膨らみ、大蔵省が増税か歳出削減を求めている。' : x.balance <= -9 ? '赤字が広がり始めている。' : '財政はまだ持ちこたえている。')],
       ['国民', '失業率 ' + x.unemp.toFixed(1) + '%' + trend('unemp', false) + '・物価上昇率 ' + sign(x.cpi, '%') + trend('cpi', false) + '・暮らしの実感 ' + Math.round(v.life) + '・手取り ' + Math.round(x.takehome) + '万円' + trend('takehome', true) + '（年収 ' + Math.round(x.salary) + '万円）・家計資産 ' + x.assets.toLocaleString() + '兆円' + trend('assets', true),
         vo.people || (x.cpi >= 4 ? '値上げが続き、給料が追いつかない。' : v.life < 40 ? '暮らしの不安が広がり、街の空気が重い。' : x.unemp >= 3 ? '職を失う人が目に見えて増えた。' : '生活はまだ落ち着いている。')],
