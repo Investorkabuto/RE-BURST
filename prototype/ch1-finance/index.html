@@ -100,6 +100,8 @@
     ['economy', 'fiscal', 'life', 'tech'].forEach(k => h += gaugeRow(NAMES[k], v[k], true));
     h += '<h2 style="margin-top:8px">党・自分</h2>';
     ['party', 'local', 'lead', 'scandal', 'tie'].forEach(k => h += gaugeRow(NAMES[k], v[k], k !== 'scandal' && k !== 'tie'));
+    const TS = { open: '未解決', resolved: '解決済み', relapse: '再燃' };
+    h += '<div class="g"><span>金融不安の案件</span><div></div><b style="white-space:nowrap">' + TS[s.topics.bailout] + '</b></div>';
     h += '<div class="g"><span>金（億円）</span><div></div><b>' + Math.round(v.money) + '</b></div>';
     h += '<div class="g"><span>乖離度</span><div class="bar"><i style="width:' + Math.min(100, s.div) + '%"></i></div><b>' + Math.round(s.div) + '</b></div>';
     $('gauges').innerHTML = h;

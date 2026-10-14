@@ -48,7 +48,7 @@
 
     // ---- 早い段階で手を打てる機会（成功すれば大きなイベントが起きない） ----
     {
-      id: 'early', title: '早期処理の機会（地銀再編と限定的な資本注入）', once: true, priority: 45,
+      id: 'early', topic: 'bailout', title: '早期処理の機会（地銀再編と限定的な資本注入）', once: true, priority: 45,
       when: (s) => !s.flags.crash && !s.flags.mq2 && s.v.damage >= 35 && s.v.damage < 58 && s.t >= 6,
       text: '大蔵省の若手が小声で言う。「今なら約2兆円と地銀の再編で、傷を小さいうちに塞げます。1年後には桁が変わります」。まだ世間は危機を感じていない。',
       choices: [
@@ -85,7 +85,7 @@
       ]
     },
     {
-      id: 'mq2', title: 'MQ-2 公的資金の早期投入論', cooldown: 1, priority: 58,
+      id: 'mq2', topic: 'bailout', title: 'MQ-2 公的資金の早期投入論', cooldown: 1, priority: 58,
       when: (s) => s.flags.crash && !s.flags.mq2,
       text: '総理が「金融機関に公的資金を入れてでも、不良債権を処理すべきだ」と発言するが、銀行業界、財界、大蔵省、世論がそろって反発する。規模を選ぶ。小さすぎれば止まらず、大きすぎれば財政と支持率が先に傷む。',
       choices: [
@@ -105,7 +105,7 @@
 
     // ---- 連鎖と泥沼 ----
     {
-      id: 'chain', title: 'E1-18 連鎖倒産', cooldown: 4, priority: 55,
+      id: 'chain', topic: 'bailout', title: 'E1-18 連鎖倒産', cooldown: 4, priority: 55,
       when: (s) => s.v.chain >= 8 && s.inj.count === 0,
       text: '弱い銀行が倒れると、その銀行から借りていた不動産会社が倒れ、下請けの建設会社や商店が倒れる。取引先の信用不安が次の銀行に飛び火する。頭取が青ざめて来る。「うちの取引先の4社が、同じ週に手形を落とせません」。',
       choices: [
@@ -120,7 +120,7 @@
       ]
     },
     {
-      id: 'more', title: 'E1-19 追加投入の判断（泥沼）', cooldown: 3, priority: 56,
+      id: 'more', topic: 'bailout', title: 'E1-19 追加投入の判断（泥沼）', cooldown: 3, priority: 56,
       when: (s) => s.inj.count >= 1 && s.inj.count < 3 && s.v.chain >= 5 && s.v.damage >= 45 && s.t - s.inj.last >= 2,
       text: '総理は言う。「あと少しで止まる」。党内は割れる。「ここで止めたら、これまでの金は無駄になる」「いや、もう止めよう」。大蔵省の担当者が示す追加の額は、前回より大きい。逐次投入は効果が7割になり、批判が積み重なる。',
       choices: [
@@ -133,7 +133,7 @@
       ]
     },
     {
-      id: 'media', title: 'E1-20 マスコミバッシングと最後の決断', once: true, priority: 57,
+      id: 'media', topic: 'bailout', title: 'E1-20 マスコミバッシングと最後の決断', once: true, priority: 57,
       when: (s) => s.inj.count >= 3 && !s.flags.media,
       text: '週刊誌と夕刊の見出しが一斉に変わる。「泥沼」「見通しの甘さ」「税金の垂れ流し」。国会では野党が追及し、与党の若手が執行部に批判を向ける。仁科が小声で言う。「先生、ここが一番、人の本性が出ます」。',
       choices: [

@@ -43,6 +43,7 @@
       inj: { count: 0, total: 0, last: -99 },
       flags: {},
       last: {},          // イベントごとの最後に起きた月
+      topics: { bailout: 'open' }, // 案件の状態：open（未解決）/ resolved（解決済み）/ relapse（再燃）
       queue: [],         // 遅れて出る効果
       log: [],
       hist: [],
@@ -111,9 +112,23 @@
       due.forEach(q => { q.fn(api); if (q.msg) log(q.msg, 'delayed'); });
     }
 
+    // 案件の状態を更新する。解決済みの案件の関連イベントは出ない。悪化すると再燃する
+    function updateTopics() {
+      const v = s.v, t = s.topics;
+      if (t.bailout !== 'resolved') {
+        const acted = s.inj.total >= 3 || s.flags.early || s.flags.liquidate;
+        if (acted && v.damage <= 40 && v.chain < 5) { t.bailout = 'resolved'; log('金融不安は収まった（公的資金・再編の案件は解決済み）', 'delayed'); }
+      } else if (v.damage >= 55 || v.chain >= 10) {
+        t.bailout = 'relapse'; log('金融不安が再燃した', 'bad');
+      }
+      if (t.bailout === 'relapse' && v.damage <= 40 && v.chain < 5) t.bailout = 'resolved';
+    }
+
     function eligible() {
+      updateTopics();
       return events
         .filter(e => {
+          if (e.topic && s.topics[e.topic] === 'resolved') return false;
           if (e.once && s.last[e.id] !== undefined) return false;
           if (e.cooldown && s.last[e.id] !== undefined && s.t - s.last[e.id] < e.cooldown) return false;
           return e.when(s);
