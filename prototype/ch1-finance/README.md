@@ -6,9 +6,16 @@
 - `events.js`：イベントの部品。`when`（起きる条件）と `choices`（選択肢と、値の変化）だけで書く
 - `omens.js`：予兆。情報源ごとの偏りを通して、隠れた値を少しずつ知らせる（状態は変えない）
 - `app.js`：画面
-- `test.js`：方針ごとに最後まで自動で動かし、結果が分かれるか確かめる（`node test.js`）
-- `fuzz.js`：選択をランダムに3000回動かし、止まらないか・全イベントに到達できるか・結果の散らばりを確かめる（`node fuzz.js`）
-- `build.js`：アーティファクト用に、1枚のHTMLにまとめる（`node build.js 出力先`）
+- `policies.js`：自動プレイの方針（史実、早期処理、ドンの説得など）
+
+自動プレイ、アーティファクトの組み立て、画面の動作確認は、共通の道具（`prototype/tools/`）を使います。
+
+```
+npm test                                                  # 方針ごとの通し試験 + ランダム3000回
+npm run sim -- prototype/ch1-finance --trace 早期 --seeds 1  # 1手ずつ値を見る
+npm run build -- prototype/ch1-finance 出力先.html          # アーティファクト用に1枚にまとめる
+npm run smoke -- prototype/ch1-finance                    # ブラウザで押し続けてエラーを見る
+```
 
 ## 試作で確かめていること
 - 大きな事件（株価の底割れ）は、金融の傷みが一定以上になったときだけ起きる。早く手を打てば起きず、国が伸びる

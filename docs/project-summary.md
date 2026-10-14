@@ -28,7 +28,8 @@
 | `docs/events/open-issues.md` | 全章の未決事項の整理（決めたこと、ユーザーの決定、後で決めること） |
 | `docs/events/z10-alternate-history.md` | 「別の歴史」の独自イベント（ZA〜ZE） |
 | `docs/events/numbers-draft.md` | 数値の初期案（試作で調整する出発点） |
-| `prototype/ch1-finance/` | 第1章の金融の部分の試作（ブラウザで動く） |
+| `prototype/ch1-finance/` | 第1章の金融と政局の試作（ブラウザで動く） |
+| `prototype/tools/` | 試作の共通の道具。自動プレイ（`sim.js`）、アーティファクトの組み立て（`build-artifact.js`）、画面の動作確認（`smoke.js`） |
 
 ---
 

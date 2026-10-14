@@ -1,0 +1,12 @@
+{
+  "name": "re-burst",
+  "private": true,
+  "description": "RE-BURST の設計書と試作",
+  "scripts": {
+    "sim": "node prototype/tools/sim.js",
+    "fuzz": "node prototype/tools/sim.js prototype/ch1-finance --fuzz 3000",
+    "test": "node prototype/tools/sim.js prototype/ch1-finance && node prototype/tools/sim.js prototype/ch1-finance --fuzz 3000",
+    "build": "node prototype/tools/build-artifact.js",
+    "smoke": "node prototype/tools/smoke.js"
+  }
+}
