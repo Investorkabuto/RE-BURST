@@ -2,195 +2,124 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RE-BURST 試作：第1章 金融</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- BUILD:HEAD -->
+<title>RE-BURST 第1章 試作</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600&family=Shippori+Mincho:wght@700&display=swap">
 <style>
-  :root { --bg:#f6f4ef; --card:#fff; --ink:#1f2328; --sub:#6a6f76; --line:#dedbd2; --acc:#8a2a2a; --good:#2b6e4f; --bad:#a33; --warn:#b7791f; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#17181a; --card:#222427; --ink:#e8e6e1; --sub:#9a9ea4; --line:#34373b; --acc:#d77; --good:#6fc79a; --bad:#f08080; --warn:#e0b050; } }
+  /* 構成：左に国・党・人の計器、右に今の決断と、届いた知らせ（予兆）と経過。判断の道具として、数値と選択肢を最優先に置く */
+  :root {
+    --bg:#eceff2; --card:#ffffff; --ink:#18212c; --sub:#5a6674; --line:#d3d9e0; --acc:#2b4a80; --acc-ink:#ffffff;
+    --good:#25785a; --bad:#b03a2a; --warn:#a1701a; --s1:#25785a; --s2:#b03a2a; --s3:#2b4a80; --s4:#a1701a; --s5:#7a5aa8;
+    --font-display:"Shippori Mincho","Hiragino Mincho ProN","Yu Mincho",serif;
+    --font-body:"Noto Sans JP","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg:#12171d; --card:#1b222b; --ink:#e6eaef; --sub:#97a3b1; --line:#2f3945; --acc:#7da2e0; --acc-ink:#0f1722;
+    --good:#5fc29c; --bad:#ee8a78; --warn:#e0b25a; --s1:#5fc29c; --s2:#ee8a78; --s3:#7da2e0; --s4:#e0b25a; --s5:#b79be6; color-scheme: dark; } }
+  :root[data-theme="dark"] {
+    --bg:#12171d; --card:#1b222b; --ink:#e6eaef; --sub:#97a3b1; --line:#2f3945; --acc:#7da2e0; --acc-ink:#0f1722;
+    --good:#5fc29c; --bad:#ee8a78; --warn:#e0b25a; --s1:#5fc29c; --s2:#ee8a78; --s3:#7da2e0; --s4:#e0b25a; --s5:#b79be6; color-scheme: dark; }
   * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.65 -apple-system,"Hiragino Sans","Noto Sans JP",sans-serif; }
-  .wrap { max-width: 980px; margin: 0 auto; padding: 16px; }
-  h1 { font-size: 18px; margin: 4px 0 2px; }
-  .sub { color: var(--sub); font-size: 13px; margin-bottom: 12px; }
-  .grid { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; }
-  .date { font-size: 22px; font-weight: 700; }
-  .g { display:grid; grid-template-columns: 110px 1fr 38px; align-items:center; gap:8px; margin:5px 0; font-size:13px; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.7 var(--font-body); padding-block: 16px;
+         padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+  h1 { font:700 20px/1.4 var(--font-display); margin: 0 0 2px; text-wrap: balance; }
+  .lede { color: var(--sub); font-size: 13px; margin: 0 0 14px; max-width: 70ch; }
+  .grid { display:grid; grid-template-columns: minmax(0,1fr) minmax(0,1.15fr); gap: 12px; align-items:start; }
+  @media (max-width: 780px) { .grid { grid-template-columns: minmax(0,1fr); } .right { order:-1; } }
+  .col { display:grid; gap:12px; min-width:0; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:14px; min-width:0; }
+  .head { display:flex; justify-content:space-between; align-items:baseline; gap:8px; flex-wrap:wrap; }
+  .date { font:700 24px/1.2 var(--font-display); margin-bottom: 6px; }
+  .world { font-size:12px; color:var(--sub); font-variant-numeric: tabular-nums; }
+  .g { display:grid; grid-template-columns: 7.5em minmax(0,1fr) 2.4em; align-items:center; gap:8px; margin:5px 0; font-size:13px; }
   .bar { height:8px; background:var(--line); border-radius:4px; overflow:hidden; }
-  .bar i { display:block; height:100%; background:var(--acc); transition: width .3s; }
+  .bar i { display:block; height:100%; background:var(--bad); transition: width .3s; }
   .bar.good i { background: var(--good); }
+  .bar.dbg i { background: var(--s5); }
   .g b { text-align:right; font-variant-numeric: tabular-nums; }
-  h2 { font-size:13px; color:var(--sub); margin:0 0 6px; letter-spacing:.04em; }
-  .ev h3 { margin:0 0 6px; font-size:16px; }
+  h2 { font-size:12px; color:var(--sub); margin:0 0 6px; letter-spacing:.08em; font-weight:600; }
+  h2.sp { margin-top:10px; }
+  .chip { display:inline-block; padding:0 8px; border-radius:99px; border:1px solid var(--line); font-size:12px; line-height:1.7; white-space:nowrap; }
+  .chip.bad { color:var(--bad); border-color:currentColor; } .chip.warn { color:var(--warn); border-color:currentColor; } .chip.good { color:var(--good); border-color:currentColor; }
+  .status { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 2px; font-size:13px; align-items:center; }
+  .ev h3 { margin:0 0 6px; font:700 17px/1.5 var(--font-display); text-wrap: balance; }
   .ev p { margin:0 0 10px; }
   button { font:inherit; }
-  .ch { display:block; width:100%; text-align:left; background:var(--bg); color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:9px 12px; margin:6px 0; cursor:pointer; }
+  .ch { display:block; width:100%; text-align:left; background:var(--bg); color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:9px 12px; margin:6px 0; cursor:pointer; }
   .ch:hover:not(:disabled) { border-color: var(--acc); }
-  .ch:disabled { opacity:.45; cursor:not-allowed; }
-  .ch small { display:block; color:var(--sub); }
-  .ctl { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:10px 0; }
-  .btn { background:var(--acc); color:#fff; border:0; border-radius:8px; padding:8px 14px; cursor:pointer; }
+  .ch:focus-visible, .btn:focus-visible { outline:2px solid var(--acc); outline-offset:2px; }
+  .ch:disabled { opacity:.5; cursor:not-allowed; }
+  .ch small { display:block; color:var(--sub); font-size:12px; }
+  .ctl { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:10px 0 0; font-size:13px; }
+  .btn { background:var(--acc); color:var(--acc-ink); border:0; border-radius:6px; padding:8px 14px; cursor:pointer; }
   .btn.alt { background:transparent; color:var(--ink); border:1px solid var(--line); }
-  #log { max-height: 220px; overflow:auto; font-size:13px; }
-  #log div { padding:2px 0; border-bottom:1px dashed var(--line); }
+  #news { max-height: 260px; overflow:auto; font-size:13px; display:grid; gap:0; }
+  .nw { display:grid; grid-template-columns: 4.6em minmax(0,1fr); gap:8px; padding:5px 0; border-bottom:1px dashed var(--line); }
+  .nw .src { font-size:11px; font-weight:600; color:var(--sub); padding-top:2px; }
+  .nw.warn .msg { color: var(--warn); } .nw.bad .msg { color: var(--bad); }
+  .nw .when { display:block; font-size:11px; color:var(--sub); }
+  .nw.fresh { animation: fresh 1.2s ease-out; }
+  @keyframes fresh { from { background: color-mix(in srgb, var(--acc) 14%, transparent); } to { background: transparent; } }
+  @media (prefers-reduced-motion: reduce) { .nw.fresh { animation: none; } .bar i { transition: none; } }
+  #log { max-height: 200px; overflow:auto; font-size:13px; }
+  #log div { padding:3px 0; border-bottom:1px dashed var(--line); }
   #log .delayed { color: var(--sub); } #log .bad { color: var(--bad); }
-  #log .choice { color: var(--ink); }
-  svg { width:100%; height:150px; }
-  .legend { font-size:12px; color:var(--sub); display:flex; gap:12px; flex-wrap:wrap; }
+  svg { width:100%; height:150px; display:block; }
+  .legend { font-size:12px; display:flex; gap:12px; flex-wrap:wrap; margin-top:4px; }
   .legend span::before { content:""; display:inline-block; width:10px; height:3px; margin-right:4px; vertical-align:middle; background:currentColor; }
-  table { border-collapse: collapse; width:100%; font-size:13px; }
-  td, th { border-bottom:1px solid var(--line); padding:4px 6px; text-align:right; } th:first-child, td:first-child { text-align:left; }
-  .tag { display:inline-block; padding:1px 8px; border-radius:99px; background:var(--bg); border:1px solid var(--line); margin:2px 4px 2px 0; font-size:12px; }
-  .hide { display:none; }
+  .tw { overflow-x:auto; }
+  table { border-collapse: collapse; width:100%; font-size:13px; font-variant-numeric: tabular-nums; }
+  td, th { border-bottom:1px solid var(--line); padding:4px 6px; text-align:right; white-space:nowrap; } th:first-child, td:first-child { text-align:left; }
+  .tag { display:inline-block; padding:1px 8px; border-radius:99px; border:1px solid var(--line); margin:2px 4px 2px 0; font-size:12px; }
+  .note { color:var(--sub); font-size:12px; }
+  .empty { color:var(--sub); font-size:13px; }
+  .sit { display:grid; gap:6px; margin:0 0 10px; padding:10px 12px; border:1px solid var(--line); border-radius:6px; background:var(--bg); font-size:13px; }
+  .sr { display:grid; grid-template-columns: 2.6em minmax(0,1fr); gap:8px; }
+  .sk { font-weight:600; color:var(--acc); }
+  .sn { display:block; font-variant-numeric: tabular-nums; font-weight:600; }
+  .sv { display:block; color:var(--sub); }
+  .tr { margin-left:2px; font-weight:600; } .tr.up { color:var(--good); } .tr.down { color:var(--bad); }
+  .kpi { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:6px 10px; margin-bottom:4px; }
+  .kpi div { display:flex; flex-direction:column; font-size:12px; color:var(--sub); }
+  .kpi b { font-size:15px; color:var(--ink); font-variant-numeric: tabular-nums; }
+  @media (max-width: 420px) { .kpi { grid-template-columns: repeat(2, minmax(0,1fr)); } }
 </style>
+<!-- /BUILD:HEAD -->
 </head>
 <body>
+<!-- BUILD:BODY -->
 <div class="wrap">
-  <h1>RE-BURST 試作：第1章 バブル崩壊と北陽銀行</h1>
-  <div class="sub">状態とルールで動く試作。イベントは日付ではなく「条件」で出ます。何もしなければ、史実どおり1992年8月に株価が底割れします。</div>
-
+  <h1>RE-BURST 第1章 バブル崩壊と父の遺産</h1>
+  <p class="lede">状態とルールで動く試作です。イベントは日付ではなく条件で出るので、史実の出来事も起きるとは限りません。金融の傷みやドンの疑惑は画面に出ません。右の「届いた知らせ」から読み取ってください。知らせを送ってくる人には、それぞれ偏りがあります。世界は遊ぶたびに少しずつ違います。</p>
   <div class="grid">
-    <div>
+    <div class="col">
       <div class="card">
-        <div class="date" id="date"></div>
+        <div class="head"><div class="date" id="date"></div><div class="world" id="world"></div></div>
         <div id="gauges"></div>
-        <div class="ctl"><label><input type="checkbox" id="hidden"> 内部の値を見る</label></div>
-        <div id="hiddenBox" class="hide"></div>
+        <div class="ctl"><label><input type="checkbox" id="hidden"> 内部の値を見る（試作の確認用）</label></div>
+        <div id="hiddenBox" hidden></div>
       </div>
-      <div class="card" style="margin-top:12px">
-        <h2>推移</h2>
-        <svg id="chart" viewBox="0 0 300 150" preserveAspectRatio="none"></svg>
+      <div class="card">
+        <h2>推移（1991年4月〜1993年8月）</h2>
+        <svg id="chart" viewBox="0 0 300 150" preserveAspectRatio="none" role="img" aria-label="景気・財政・党の支持率・暮らしの実感の推移"></svg>
         <div class="legend" id="legend"></div>
       </div>
     </div>
-    <div>
+    <div class="col right">
       <div class="card ev" id="evcard"></div>
-      <div class="card" style="margin-top:12px"><h2>これまで</h2><div id="log"></div></div>
+      <div class="card"><h2>届いた知らせ</h2><div id="news"></div></div>
+      <div class="card"><h2>これまで</h2><div id="log"></div></div>
     </div>
   </div>
 </div>
-
+<!-- /BUILD:BODY -->
 <script src="engine.js"></script>
 <script src="events.js"></script>
-<script>
-(function () {
-  const { createGame, ymLabel } = REB; const EV = REB_EVENTS.events;
-  let g, timer = null, token = 0;
-
-  const NAMES = {
-    economy: '景気', fiscal: '財政', life: '暮らしの実感', tech: '技術力',
-    party: '党の支持率', local: '地元の支持', lead: '求心力', scandal: 'スキャンダル', tie: 'しがらみ'
-  };
-  const HIDDEN = { damage: '金融の傷み', chain: '連鎖倒産の勢い', backlash: '救済への批判', funding: '資金調達力', moral: 'モラルハザード', gm: '傷みの増え方の補正' };
-  const SERIES = [['economy', '景気', '#2b6e4f'], ['damage', '金融の傷み', '#a33'], ['fiscal', '財政', '#2d5d9f'], ['funding', '資金調達力', '#b7791f']];
-
-  const $ = (id) => document.getElementById(id);
-
-  function newGame() { g = createGame(EV); token++; render(); step(); }
-
-  function gaugeRow(name, val, good) {
-    return '<div class="g"><span>' + name + '</span><div class="bar ' + (good ? 'good' : '') + '"><i style="width:' + Math.max(0, Math.min(100, val)) + '%"></i></div><b>' + Math.round(val) + '</b></div>';
-  }
-
-  function render() {
-    const s = g.s, v = s.v;
-    $('date').textContent = ymLabel(Math.min(s.t, 28));
-    let h = '<h2>国</h2>';
-    ['economy', 'fiscal', 'life', 'tech'].forEach(k => h += gaugeRow(NAMES[k], v[k], true));
-    h += '<h2 style="margin-top:8px">党・自分</h2>';
-    ['party', 'local', 'lead', 'scandal', 'tie'].forEach(k => h += gaugeRow(NAMES[k], v[k], k !== 'scandal' && k !== 'tie'));
-    const TS = { open: '未解決', resolved: '解決済み', relapse: '再燃' };
-    h += '<div class="g"><span>金融不安の案件</span><div></div><b style="white-space:nowrap">' + TS[s.topics.bailout] + '</b></div>';
-    h += '<div class="g"><span>金（億円）</span><div></div><b>' + Math.round(v.money) + '</b></div>';
-    h += '<div class="g"><span>乖離度</span><div class="bar"><i style="width:' + Math.min(100, s.div) + '%"></i></div><b>' + Math.round(s.div) + '</b></div>';
-    $('gauges').innerHTML = h;
-    let hb = '';
-    Object.keys(HIDDEN).forEach(k => hb += gaugeRow(HIDDEN[k], k === 'gm' ? v[k] * 50 + 50 : v[k], false));
-    hb += '<div class="sub">投入：' + s.inj.count + '回 / 計' + s.inj.total + '兆円</div>';
-    $('hiddenBox').innerHTML = hb;
-    $('hiddenBox').classList.toggle('hide', !$('hidden').checked);
-    drawChart();
-    $('log').innerHTML = s.log.slice().reverse().map(l => '<div class="' + l.kind + '">' + ymLabel(l.t) + ' ' + l.msg + '</div>').join('');
-  }
-
-  function drawChart() {
-    const h = g.s.hist; const svg = $('chart');
-    let out = '<line x1="0" y1="75" x2="300" y2="75" stroke="currentColor" opacity=".12"/>';
-    SERIES.forEach(([k, , c]) => {
-      if (h.length < 2) return;
-      const pts = h.map((p, i) => (i / 28 * 300).toFixed(1) + ',' + (150 - p[k] * 1.5).toFixed(1)).join(' ');
-      out += '<polyline fill="none" stroke="' + c + '" stroke-width="2" vector-effect="non-scaling-stroke" points="' + pts + '"/>';
-    });
-    svg.innerHTML = out;
-    $('legend').innerHTML = SERIES.map(([, n, c]) => '<span style="color:' + c + '">' + n + '</span>').join('');
-  }
-
-  function showEvent(ev) {
-    const cs = g.choices();
-    let h = '<h2>' + ymLabel(g.s.t) + '</h2><h3>' + ev.title + '</h3><p>' + ev.text + '</p>';
-    cs.forEach(c => {
-      h += '<button class="ch" data-i="' + c.i + '"' + (c.block ? ' disabled' : '') + '>' + c.label +
-        (c.note ? '<small>' + c.note + '</small>' : '') + (c.block ? '<small>選べない：' + c.block + '</small>' : '') + '</button>';
-    });
-    $('evcard').innerHTML = h;
-    $('evcard').querySelectorAll('.ch').forEach(b => b.onclick = () => { g.choose(+b.dataset.i); render(); step(); });
-  }
-
-  function step() {
-    const my = token;
-    const r = g.tick();
-    if (r.type === 'month') { render(); $('evcard').innerHTML = '<h2>' + ymLabel(g.s.t) + '</h2><p class="sub">時間が進んでいます…</p>'; setTimeout(() => { if (my === token) step(); }, 90); return; }
-    if (r.type === 'event') { render(); showEvent(r.event); return; }
-    if (r.type === 'end') { render(); showEnd(); }
-  }
-
-  // 史実の基準線：史実に近い選択（hist）を選び続けた場合
-  function baseline() {
-    const b = createGame(EV); let n = 0;
-    while (n++ < 500) {
-      const r = b.tick(); if (r.type === 'end') break;
-      if (r.type === 'event') {
-        const cs = r.event.choices; let i = cs.findIndex(c => c.hist && !(c.req && c.req(b.s)));
-        if (i < 0) i = cs.length - 1; b.choose(i);
-      }
-    }
-    return b.s;
-  }
-
-  function routeTags(s) {
-    const f = s.flags, t = [];
-    if (f.inspect) t.push('早期に検査を促した'); if (f.forbear) t.push('追い貸しを認めた'); if (f.merge) t.push('合併を仲介した');
-    if (f.early) t.push('早期処理（資本注入）'); if (f.refused) t.push('公的資金に反対'); if (f.notebook) t.push('父の手帳を読んだ');
-    if (s.inj.count >= 1 && !f.bigbang && !f.desperate) t.push(s.inj.count >= 3 ? '逐次投入の泥沼' : '公的資金を投入');
-    if (f.bigbang) t.push('途中から一気に大規模投入'); if (f.desperate) t.push('やけくそ投入');
-    if (f.liquidate) t.push('破綻整理'); if (f.resigned) t.push('責任を取って辞職');
-    if (f.blackfund) t.push('裏金に手を出した'); if (f.cleanFund) t.push('きれいな資金で回した'); if (f.reform) t.push('政治改革を進めた');
-    if (f.boom) t.push('余力を活かした'); if (!f.crash) t.push('株価の底割れは起きなかった');
-    return t;
-  }
-
-  function showEnd() {
-    const s = g.s, v = s.v, b = baseline(), bv = b.v;
-    const row = (n, a, c, hi) => '<tr><td>' + n + '</td><td>' + Math.round(a) + '</td><td>' + Math.round(c) + '</td><td style="color:' + ((a - c) * (hi ? 1 : -1) >= 0 ? 'var(--good)' : 'var(--bad)') + '">' + (a - c >= 0 ? '+' : '') + Math.round(a - c) + '</td></tr>';
-    const res = s.result;
-    let h = '<h2>1993年8月 第1章の終わり</h2><h3>' + (res ? (res.won ? '当選：' : '落選：') + res.partyResult : '終了') + '</h3>';
-    h += '<p>' + routeTags(s).map(x => '<span class="tag">' + x + '</span>').join('') + '</p>';
-    h += '<table><tr><th>あなた / 史実の基準線</th><th>あなた</th><th>史実</th><th>差</th></tr>' +
-      row('景気', v.economy, bv.economy, true) + row('財政', v.fiscal, bv.fiscal, true) + row('暮らしの実感', v.life, bv.life, true) +
-      row('技術力', v.tech, bv.tech, true) + row('金融の傷み', v.damage, bv.damage, false) + row('党の支持率', v.party, bv.party, true) +
-      row('資金調達力', v.funding, bv.funding, true) + '</table>';
-    h += '<p class="sub">乖離度 ' + Math.round(s.div) + '。「史実」は、追い貸し・先送りを選び続けた場合の同じ試作の結果です。';
-    if (!s.flags.crash && v.economy > bv.economy + 8) h += '<br>大きな事件を起こさず、国が史実より伸びました。';
-    else if (v.economy > bv.economy + 8) h += '<br>痛みを引き受けた結果、史実より国が持ち直しました（代わりに党と財政が傷んでいます）。';
-    else if (v.economy < bv.economy - 3) h += '<br>手を打ったのに、悪い事態が重なって、史実より悪い状況になりました。';
-    h += '</p><div class="ctl"><button class="btn" id="again">もう一度</button></div>';
-    $('evcard').innerHTML = h; $('again').onclick = newGame;
-  }
-
-  $('hidden').onchange = render;
-  newGame();
-})();
-</script>
+<script src="omens.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
