@@ -130,8 +130,8 @@
           effect: (g) => { g.add('fiscal', -4); g.add('tech', 8); g.s.flags.boom = true; g.later(10, '技術投資が実り、景気が伸びた', (h) => h.add('economy', 4)); } },
         { label: '増税して財政を立て直す（所得税・法人税）', note: '赤字 約−4.8兆円/年 成長率 約−0.6% 党の支持率↓ 暮らし↓',
           effect: (g) => { g.add('fiscal', 6); g.add('economy', -2); g.add('party', -3); g.add('life', -2); g.s.flags.boom = true; g.s.flags.taxUp = true; } },
-        { label: '歳出を絞る（公共事業を削る）', note: '赤字 約−3.2兆円/年 地元の支持↓ 暮らし↓（小） 業界の献金↓',
-          effect: (g) => { g.add('fiscal', 4); g.add('local', -4); g.add('life', -2); g.add('economy', -1); g.add('funding', -5); g.s.flags.boom = true; g.s.flags.spendCut = true; } },
+        { label: '歳出を絞る（公共事業を削る）', note: '赤字 約−3.2兆円/年 地元の支持↓ 暮らし↓（小） 業界の献金↓／治水などの工事も止まる',
+          effect: (g) => { g.add('fiscal', 4); g.add('local', -4); g.add('life', -2); g.add('economy', -1); g.add('funding', -5); g.add('bousai', -10); g.s.flags.boom = true; g.s.flags.spendCut = true; } },
         { label: '減税で暮らしを支える', note: '赤字 約+3.2兆円/年 暮らし↑ 党の支持率↑ 成長率 約+0.3%',
           effect: (g) => { g.add('life', 5); g.add('party', 3); g.add('fiscal', -4); g.add('economy', 1); g.s.flags.boom = true; } }
       ]
@@ -149,8 +149,8 @@
       choices: [
         { label: '増税を受け入れる（所得税・法人税）', note: (s) => '赤字 約−4.8兆円/年 党の支持率↓' + (s.ind.growth < 0 ? ' 景気が悪い時の増税は効きすぎる（成長率 約−1.8%）' : ' 成長率 約−0.9%'),
           effect: (g) => { const bad = g.s.ind.growth < 0; g.add('fiscal', 6); g.add('economy', bad ? -6 : -3); g.add('party', -4); g.add('life', -3); g.s.flags.taxUp = true; } },
-        { label: '歳出を絞る（公共事業を削る）', note: '赤字 約−3.2兆円/年 地元の支持↓ 業界の献金↓ 成長率 約−0.6%',
-          effect: (g) => { g.add('fiscal', 4); g.add('local', -5); g.add('economy', -2); g.add('life', -2); g.add('tie', -3); g.add('funding', -5); g.s.flags.spendCut = true; } },
+        { label: '歳出を絞る（公共事業を削る）', note: '赤字 約−3.2兆円/年 地元の支持↓ 業界の献金↓ 成長率 約−0.6%／治水などの工事も止まる',
+          effect: (g) => { g.add('fiscal', 4); g.add('local', -5); g.add('economy', -2); g.add('life', -2); g.add('tie', -3); g.add('funding', -5); g.add('bousai', -8); g.s.flags.spendCut = true; } },
         { label: '突っぱね、国債で景気を支え続ける', hist: true, note: '赤字 約+1.6兆円/年 成長率 約+0.3%／次の要求はもっと厳しくなる',
           effect: (g) => { g.add('fiscal', -2); g.add('economy', 1); g.s.flags.mofRefused = (g.s.flags.mofRefused || 0) + 1; } }
       ]
@@ -158,7 +158,7 @@
 
     // ---- 大きな事件：傷みが大きくなったときだけ起きる ----
     {
-      id: 'crash', title: 'E1-10 株価の底割れと経済対策', once: true, priority: 60,
+      id: 'crash', title: 'E1-10 株価の底割れと経済対策', once: true, tension: true, priority: 60,
       when: (s) => !s.flags.crash && s.v.damage >= s.world.crashAt,
       voices: (s) => ({
         country: '主計局長：「経済対策を打てば、赤字はさらに年10兆円近く膨らみます」',
@@ -202,7 +202,7 @@
 
     // ---- 連鎖と泥沼 ----
     {
-      id: 'chain', topic: 'bailout', title: 'E1-18 連鎖倒産', cooldown: 4, priority: 55,
+      id: 'chain', topic: 'bailout', title: 'E1-18 連鎖倒産', cooldown: 4, tension: true, priority: 55,
       when: (s) => s.v.chain >= 8 && s.inj.count === 0,
       voices: (s) => ({
         country: '主計局長：「破綻の処理には、預金保険の資金が足りません」',
@@ -222,7 +222,7 @@
       ]
     },
     {
-      id: 'more', topic: 'bailout', title: 'E1-19 追加投入の判断（泥沼）', cooldown: 3, priority: 56,
+      id: 'more', topic: 'bailout', title: 'E1-19 追加投入の判断（泥沼）', cooldown: 3, tension: true, priority: 56,
       when: (s) => s.inj.count >= 1 && s.inj.count < 3 && s.v.chain >= 5 && s.v.damage >= 45 && s.t - s.inj.last >= 2,
       text: '総理は言う。「あと少しで止まる」。党内は割れる。「ここで止めたら、これまでの金は無駄になる」「いや、もう止めよう」。大蔵省の担当者が示す追加の額は、前回より大きい。逐次投入は効果が7割になり、批判が積み重なる。',
       choices: [
@@ -235,7 +235,7 @@
       ]
     },
     {
-      id: 'media', topic: 'bailout', title: 'E1-20 マスコミバッシングと最後の決断', once: true, priority: 57,
+      id: 'media', topic: 'bailout', title: 'E1-20 マスコミバッシングと最後の決断', once: true, tension: true, priority: 57,
       when: (s) => s.inj.count >= 3 && !s.flags.media,
       text: '週刊誌と夕刊の見出しが一斉に変わる。「泥沼」「見通しの甘さ」「税金の垂れ流し」。国会では野党が追及し、与党の若手が執行部に批判を向ける。仁科が小声で言う。「先生、ここが一番、人の本性が出ます」。',
       choices: [
@@ -252,7 +252,7 @@
 
     // ---- 世論と資金 ----
     {
-      id: 'bash', title: 'E1-17 救済へのバッシング', cooldown: 6, priority: 52,
+      id: 'bash', title: 'E1-17 救済へのバッシング', cooldown: 6, tension: true, priority: 52,
       when: (s) => s.v.backlash >= 35,
       text: '見出しが「銀行を税金で救うのか」に変わる。住宅ローンに苦しむ人、救済から外れた取引先、経営努力をしてきた同業の他行からも「なぜあの銀行だけ」と不満が出る。党本部の電話が鳴り止まない。',
       choices: [
@@ -342,7 +342,7 @@
       ]
     },
     {
-      id: 'e112', title: 'E1-12 ドンの逮捕', once: true, priority: 60,
+      id: 'e112', title: 'E1-12 ドンの逮捕', once: true, tension: true, priority: 60,
       when: (s) => s.don.status === 'resigned' && s.t - s.last.e111 >= 3 &&
         (s.flags.pursued || s.flags.publish || s.v.nishina <= 10 || s.v.party <= 42 || s.v.donScandal >= 88),
       text: (s) => '権藤 嘉平が脱税の容疑で逮捕される。自宅の金庫から金の延べ棒が見つかったと、テレビが繰り返し流す。世論が激しく怒り、選挙制度と政治資金の「政治改革」を求める声が一気に高まる。' +
@@ -375,6 +375,101 @@
           effect: (g) => { g.add('nishina', 20); g.add('lead', -2); g.add('money', -10); } },
         { label: '辞表を受け取る', note: '地元の支持↓↓ 資金↓／仁科からの知らせが届かなくなる',
           effect: (g) => { g.s.flags.nishinaGone = true; g.add('local', -10); g.add('funding', -8); } }
+      ]
+    },
+
+    // ---- 史実にない出来事（invented：乖離度を上げない） ----
+    // 型1：成功が自分で生む問題。景気の過熱と歳出の膨張で物価が上がる
+    {
+      id: 'inflation', title: '物価の高騰', invented: true, cooldown: 6, priority: 48,
+      when: (s) => s.ind.cpi >= 4.5,
+      text: (s) => '物価上昇率が年' + s.ind.cpi.toFixed(1) + '%に達した。好景気と大型の予算で、金が市中にあふれている。賃上げは追いつかず、家計は値上げの分だけ苦しくなる。',
+      voices: (s) => ({
+        country: '日銀の理事：「このままでは物価が止まりません。金利を上げさせていただきたい」',
+        people: '主婦：「スーパーの値札が毎月変わる。給料は去年と同じなのに」',
+        business: '経営者：「金利を上げられたら、設備投資の計画は全部止まる」'
+      }),
+      choices: [
+        { label: '日銀の利上げを容認する', note: '物価↓↓ 成長率 約−1.2% 株価↓ 倒産↑（小）',
+          effect: (g) => { g.add('infl', -18); g.add('economy', -4); g.add('damage', 2); } },
+        { label: '歳出を絞って景気を冷ます', note: '物価↓ 赤字 約−2.4兆円/年 地元の支持↓／治水などの工事も止まる',
+          effect: (g) => { g.add('infl', -10); g.add('fiscal', 3); g.add('local', -3); g.add('bousai', -6); } },
+        { label: '公共料金を凍結し、生活必需品に補助を出す', note: '暮らし↑ 党の支持率↑ 赤字 約+2.4兆円/年／物価の圧力はかえって残る',
+          effect: (g) => { g.add('life', 4); g.add('party', 2); g.add('fiscal', -3); g.add('infl', 2); } },
+        { label: '（何もしない）', note: '暮らし↓ 物価はさらに上がる', effect: (g) => { g.add('life', -3); g.add('infl', 4); } }
+      ]
+    },
+    {
+      id: 'riot', title: '物価高騰への抗議が暴動に', invented: true, tension: true, once: true, priority: 66,
+      when: (s) => s.ind.cpi >= 6 || (s.ind.cpi >= 5 && s.v.life < 45),
+      text: (s) => '灯油と米の値上がりに抗議するデモが、大阪で暴徒化した。商店のシャッターが壊され、機動隊が出動する。物価上昇率は年' + s.ind.cpi.toFixed(1) + '%。テレビは「好景気の陰で」と繰り返す。',
+      voices: (s) => ({
+        country: '警察庁：「首都圏に広がる前に、強い姿勢を見せるべきです」',
+        people: '日雇いの労働者：「景気がいいのは株を持ってる連中だけだ」',
+        business: '商店会：「店を壊された。補償はどうなるんだ」'
+      }),
+      choices: [
+        { label: '機動隊で鎮め、物価対策を約束する', note: '求心力↑（小） 党の支持率↓ 物価↓（小）',
+          effect: (g) => { g.add('lead', 2); g.add('party', -4); g.add('infl', -5); g.add('image', -3); } },
+        { label: '緊急の生活支援金を配る', note: '暮らし↑ 党の支持率↑ 赤字 約+4.8兆円/年／物価の圧力は増す',
+          effect: (g) => { g.add('life', 6); g.add('party', 2); g.add('fiscal', -6); g.add('infl', 4); } },
+        { label: '日銀に大幅な利上げを求め、物価を力ずくで抑える', note: '物価↓↓↓ 成長率 約−2.4% 倒産↑',
+          effect: (g) => { g.add('infl', -30); g.add('economy', -8); g.add('damage', 4); g.add('party', -2); } },
+        { label: '（何もしない）', note: '党の支持率↓↓ 地元の支持↓ 暮らし↓', effect: (g) => { g.add('party', -8); g.add('local', -5); g.add('life', -4); } }
+      ]
+    },
+
+    // 型2：外からの衝撃。起きるかどうかは語り部（chance）が決め、被害の大きさは防災力で決まる
+    {
+      id: 'levee', title: '首都の治水計画', invented: true, once: true, priority: 25,
+      when: (s) => s.t >= 7,
+      text: '建設省の河川局長が来る。「荒川と隅田川の堤防の補強が、予算不足で計画の6割で止まっています。地下に巨大な放水路を掘る構想もありますが、10年がかりで、1兆円を超えます」。地元の道路の陳情と、同じ予算の取り合いになる。',
+      voices: (s) => ({
+        country: '河川局長：「大雨は毎年来るわけではありません。だから予算が付かないのです」',
+        people: '江東区の町会長：「この辺りは海抜ゼロメートルだ。一度溢れたら、二階まで水が来る」',
+        business: '地元の建設業者：「放水路より、うちの県の道路を先にお願いしますよ」'
+      }),
+      choices: [
+        { label: '堤防の補強と地下放水路に予算を付ける', note: '防災力↑↑ 赤字 約+2.4兆円/年 地元の支持↓（小）',
+          effect: (g) => { g.add('bousai', 28); g.add('fiscal', -3); g.add('local', -2); g.s.flags.levee = true; } },
+        { label: '堤防の補強だけ進める', note: '防災力↑ 赤字 約+0.8兆円/年',
+          effect: (g) => { g.add('bousai', 12); g.add('fiscal', -1); } },
+        { label: 'その予算を地元の道路に回す', note: '地元の支持↑ しがらみ↑ 防災力↓',
+          effect: (g) => { g.add('local', 4); g.add('tie', 3); g.add('bousai', -8); g.add('money', 5); } }
+      ]
+    },
+    {
+      id: 'flood', title: '首都の大水害', invented: true, tension: true, once: true, priority: 70,
+      // 語り部：9か月目以降、波乱のない月が8か月を超えると、月ごとの確率が上がっていく
+      chance: (s) => s.t < 9 ? 0 : 0.004 + Math.max(0, (s.t - s.lastTension) - 8) * 0.004,
+      when: (s) => s.shock.flood !== undefined,
+      // 被害は選ぶ前に出る。大きさは防災力で決まる
+      onStart: (g) => {
+        const b = g.s.v.bousai;
+        if (b >= 65) { g.add('economy', -1); return; }
+        if (b >= 45) { g.add('economy', -4); g.add('life', -3); g.add('fiscal', -2); return; }
+        g.add('economy', -9); g.add('life', -7); g.add('fiscal', -4); g.add('damage', 4); g.add('aware', 8);
+        g.log('首都の機能が麻痺した。株式市場も止まった', 'bad');
+      },
+      text: (s) => {
+        const b = s.v.bousai;
+        if (b >= 65) return '大型の台風が関東を直撃した。荒川は計画高水位を超えたが、補強した堤防と地下の放水路が持ちこたえた。浸水は一部の低地にとどまり、首都の機能は1日で戻った。河川局長が電話で言う。「間に合いました」。';
+        if (b >= 45) return '大型の台風が関東を直撃した。隅田川沿いの低地が浸水し、地下鉄の一部の駅に水が流れ込んだ。都心の交通は3日止まり、企業の本社機能も混乱している。';
+        return '大型の台風が関東を直撃した。荒川の堤防が決壊し、江東・墨田・江戸川の低地が水に沈んだ。地下鉄は水没し、霞が関と大手町の機能が麻痺した。証券取引所も閉まり、首都が止まった。';
+      },
+      voices: (s) => ({
+        country: s.v.bousai >= 65 ? '河川局長：「放水路がなければ、都心が沈んでいました」' : '主計局長：「復旧には' + (s.v.bousai >= 45 ? '数兆円' : '10兆円を超える額') + 'が要ります。補正予算を組むしかありません」',
+        people: s.v.bousai >= 65 ? '下町の住民：「床下で済んだ。堤防に感謝だ」' : '避難所の住民：「家も車も水の下だ。いつ帰れるのか」',
+        business: s.v.bousai >= 65 ? '経済団体：「首都の備えが、海外の投資家の評価を上げた」' : '大手企業の総務部長：「本社機能を大阪に移す検討を始めました」'
+      }),
+      choices: [
+        { label: '補正予算で復旧を急ぐ', note: (s) => s.v.bousai >= 65 ? '被害は小さい。赤字 約+1.6兆円/年 党の支持率↑（小）' : '赤字 約+6.4兆円/年 党の支持率↑／半年後に復旧の需要で景気が戻る',
+          effect: (g) => { const big = g.s.v.bousai < 65; g.add('fiscal', big ? -8 : -2); g.add('party', big ? 3 : 1); if (big) g.later(6, '復旧の工事が進み、景気が戻り始めた', (h) => h.add('economy', 4)); } },
+        { label: '首都機能の分散を打ち出す', note: '改革派の評価↑ 赤字 約+3.2兆円/年 技術力↑（小）／地元の支持↑（地方への移転を期待される）',
+          effect: (g) => { g.add('image', 6); g.add('fiscal', -4); g.add('tech', 2); g.add('local', 3); g.s.flags.decentral = true; } },
+        { label: '被災者の生活支援を最優先する', note: '暮らし↑ 党の支持率↑ 赤字 約+3.2兆円/年',
+          effect: (g) => { g.add('life', 4); g.add('party', 4); g.add('fiscal', -4); } },
+        { label: '（何もしない）', note: '党の支持率↓↓ 暮らし↓', effect: (g) => { g.add('party', -8); g.add('life', -5); } }
       ]
     },
 

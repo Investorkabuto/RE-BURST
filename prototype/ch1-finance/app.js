@@ -11,7 +11,7 @@
     party: '党の支持率', local: '地元の支持', lead: '求心力', scandal: 'スキャンダル', tie: 'しがらみ', image: '改革派の評価',
     donRel: 'ドンとの関係', nishina: '仁科の忠誠'
   };
-  const HIDDEN = { damage: '金融の傷み', chain: '連鎖倒産の勢い', aware: '世論の危機認識', backlash: '救済への批判', funding: '資金調達力', moral: 'モラルハザード', donScandal: 'ドンの疑惑', reform: '政治改革の世論' };
+  const HIDDEN = { damage: '金融の傷み', chain: '連鎖倒産の勢い', aware: '世論の危機認識', backlash: '救済への批判', funding: '資金調達力', moral: 'モラルハザード', donScandal: 'ドンの疑惑', reform: '政治改革の世論', infl: '物価の圧力', bousai: '防災力' };
   const SERIES = [['economy', '景気', 'var(--s1)'], ['fiscal', '財政', 'var(--s3)'], ['party', '党の支持率', 'var(--s4)'], ['life', '暮らしの実感', 'var(--s2)']];
   const DEBUG_SERIES = [['damage', '金融の傷み（内部）', 'var(--s5)'], ['aware', '世論の危機認識（内部）', 'var(--sub)']];
   const DON_STATUS = { active: '健在', resigned: '議員辞職', arrested: '逮捕', shadow: '院政' };
@@ -46,7 +46,7 @@
     $('world').textContent = '世界 #' + s.seed;
     const x = s.ind;
     let h = '<h2>主な指標</h2><div class="kpi">' +
-      [['成長率', sign(x.growth, '%')], ['財政収支', sign(x.balance, '兆円')], ['失業率', x.unemp.toFixed(1) + '%'], ['倒産', '月' + x.bankrupt.toLocaleString() + '件'], ['日経平均', x.nikkei.toLocaleString() + '円'], ['税収', x.tax.toFixed(0) + '兆円']]
+      [['成長率', sign(x.growth, '%')], ['財政収支', sign(x.balance, '兆円')], ['失業率', x.unemp.toFixed(1) + '%'], ['倒産', '月' + x.bankrupt.toLocaleString() + '件'], ['日経平均', x.nikkei.toLocaleString() + '円'], ['物価上昇率', sign(x.cpi, '%')]]
         .map(([k, val]) => '<div><span>' + k + '</span><b>' + val + '</b></div>').join('') + '</div>';
     h += '<h2 class="sp">国</h2>';
     ['economy', 'fiscal', 'life', 'tech'].forEach(k => h += gaugeRow(NAMES[k], v[k], 'good'));
@@ -66,7 +66,7 @@
     const dbg = $('hidden').checked;
     let hb = '<h2 class="sp">内部の値（本番では見えない）</h2>';
     Object.keys(HIDDEN).forEach(k => hb += gaugeRow(HIDDEN[k], v[k], 'dbg'));
-    hb += '<div class="note">投入：' + s.inj.count + '回 / 計' + s.inj.total + '兆円。時期尚早の度合い：' + Math.round(REB.prematurity(s) * 100) + '%。底割れの境目：' + s.world.crashAt.toFixed(0) + '</div>';
+    hb += '<div class="note">投入：' + s.inj.count + '回 / 計' + s.inj.total + '兆円。時期尚早の度合い：' + Math.round(REB.prematurity(s) * 100) + '%。底割れの境目：' + s.world.crashAt.toFixed(0) + '。平穏の月数（語り部）：' + REB.calm(s) + (s.shock.flood !== undefined ? '。水害：' + ymLabel(s.shock.flood) : '') + '</div>';
     $('hiddenBox').innerHTML = hb;
     $('hiddenBox').hidden = !dbg;
     drawChart(dbg);
@@ -115,8 +115,8 @@
     const rows = [
       ['国', '財政収支 ' + sign(x.balance, '兆円/年') + trend('balance', true) + '・税収 ' + x.tax.toFixed(0) + '兆円・成長率 ' + sign(x.growth, '%') + trend('growth', true),
         vo.country || (x.balance <= -12 ? '国債の発行が膨らみ、大蔵省が増税か歳出削減を求めている。' : x.balance <= -9 ? '赤字が広がり始めている。' : '財政はまだ持ちこたえている。')],
-      ['国民', '失業率 ' + x.unemp.toFixed(1) + '%' + trend('unemp', false) + '・暮らしの実感 ' + Math.round(v.life),
-        vo.people || (v.life < 40 ? '暮らしの不安が広がり、街の空気が重い。' : x.unemp >= 3 ? '職を失う人が目に見えて増えた。' : '生活はまだ落ち着いている。')],
+      ['国民', '失業率 ' + x.unemp.toFixed(1) + '%' + trend('unemp', false) + '・物価上昇率 ' + sign(x.cpi, '%') + trend('cpi', false) + '・暮らしの実感 ' + Math.round(v.life),
+        vo.people || (x.cpi >= 4 ? '値上げが続き、給料が追いつかない。' : v.life < 40 ? '暮らしの不安が広がり、街の空気が重い。' : x.unemp >= 3 ? '職を失う人が目に見えて増えた。' : '生活はまだ落ち着いている。')],
       ['企業', '倒産 月' + x.bankrupt.toLocaleString() + '件' + trend('bankrupt', false) + '・日経平均 ' + x.nikkei.toLocaleString() + '円' + trend('nikkei', true),
         vo.business || (x.bankrupt >= 1500 ? '連鎖倒産が地方に広がっている。' : x.bankrupt >= 1000 ? '中小企業の資金繰りが苦しくなっている。' : '設備投資の話が出ている。')]
     ];
@@ -171,6 +171,8 @@
     t.push('ドンは' + { active: '最後まで健在', resigned: '議員辞職', arrested: '逮捕された', shadow: '院政を敷いた' }[s.don.status]);
     if (f.nishinaGone) t.push('仁科が去った');
     if (f.partySplit) t.push('党が割れた'); if (f.newParty) t.push('新党を作った');
+    if (s.last.inflation !== undefined) t.push('物価が高騰した'); if (s.last.riot !== undefined) t.push('物価の暴動が起きた');
+    if (f.levee) t.push('首都の治水に投資した'); if (s.last.flood !== undefined) t.push(s.v.bousai >= 65 ? '水害を堤防が防いだ' : '首都が水害で止まった');
     if (f.boom) t.push('余力を活かした'); if (!f.crash) t.push('株価の底割れは起きなかった');
     return t;
   }

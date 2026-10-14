@@ -69,7 +69,9 @@
         moral: 0,      // モラルハザード（緩み）
         aware: 8,      // 世論の危機認識
         donScandal: 35,// ドンの疑惑（捜査と報道の進み具合）
-        reform: 20     // 政治改革を求める世論
+        reform: 20,    // 政治改革を求める世論
+        infl: 30,      // 物価の圧力（景気の過熱と歳出の膨張で高まる）
+        bousai: 50     // 防災力（治水への投資で上がり、歳出の削減で下がる）
       },
       // ドンの状態。stance は公的資金への立場、status は立場の変化
       don: { stance: 'oppose', status: 'active' }, // oppose/neutral ・ active/resigned/arrested/shadow
@@ -80,6 +82,8 @@
       queue: [],         // 遅れて出る効果
       log: [],
       news: [],          // 予兆（情報源からの知らせ）
+      shock: {},         // 外からの衝撃が起きた月（語り部が起こす）
+      lastTension: 0,    // 最後に大きな波乱が起きた月（語り部が使う）
       hist: [],
       div: 0,            // 乖離度
       over: null
@@ -95,8 +99,12 @@
     const unemp = 2.1 + Math.max(0, 56 - v.economy) * 0.03 + v.chain * 0.008; // 失業率（%）
     const tax = 60 + (v.economy - 56) * 0.5;                     // 税収（兆円/年）
     const balance = -(6.5 - (v.economy - 56) * 0.3 + v.spend);   // 単年度の財政収支（兆円/年。赤字は国債で埋める）
-    return { growth, nikkei, bankrupt, unemp, tax, balance };
+    const cpi = Math.max(-1.5, (v.infl - 30) * 0.12 + 2.0);        // 物価上昇率（%）
+    return { growth, nikkei, bankrupt, unemp, tax, balance, cpi };
   }
+
+  // 語り部：大きな波乱のない月が続くほど、外からの衝撃が起きやすくなる（被害の大きさは備えで決まる）
+  function calm(s) { return s.t - s.lastTension; }
 
   // 対策A：世論がまだ危機を感じていないうちに手を打つほど、反発が大きい（0〜1）
   function prematurity(s) { return clamp((45 - s.v.aware) / 45, 0, 1); }
@@ -160,10 +168,13 @@
       else v.chain = v.chain * 0.9;
       const et = 66 - v.damage * 0.35 - v.chain * 0.35 + (v.tech - 50) * 0.1;
       v.economy = clamp(v.economy + (et - v.economy) * 0.12, 0, 100);
-      const lt = 58 - v.damage * 0.15 - v.chain * 0.45 + (v.economy - 50) * 0.3;
+      const lt = 58 - v.damage * 0.15 - v.chain * 0.45 + (v.economy - 50) * 0.3 - Math.max(0, s.ind.cpi - 3) * 3; // 物価高は暮らしを削る
       v.life = clamp(v.life + (lt - v.life) * 0.08, 0, 100);
       v.fiscal = clamp(v.fiscal - 0.08 - (v.economy < 45 ? 0.1 : 0) + (v.economy > 60 ? 0.05 : 0), 0, 100);
       v.spend = v.spend * 0.97;
+      // 物価の圧力：景気の過熱と、膨らんだ歳出で高まる
+      const it = 28 + (v.economy - 50) * 2.2 + Math.max(0, v.spend) * (v.economy >= 50 ? 2.5 : 0.75);
+      v.infl = clamp(v.infl + (it - v.infl) * 0.08, 0, 100);
       v.backlash = v.backlash * 0.97;
       // 世論の危機認識は、本当の傷みより遅れて追いつく
       const at = clamp((v.damage - 30) * 1.3 + v.chain * 1.2 + (s.flags.crash ? 20 : 0), 0, 100);
@@ -184,8 +195,17 @@
       v.local = clamp(v.local + (lct - v.local) * 0.04, 0, 100);
       v.moral = v.moral * 0.99;
       s.ind = indicators(s);
+      rollShocks();
       s.hist.push({ t: s.t, economy: v.economy, damage: v.damage, fiscal: v.fiscal, party: v.party, life: v.life, aware: v.aware, ind: s.ind });
       omen();
+    }
+
+    // 外からの衝撃：chance(s) を持つイベントは、月ごとに確率で起きる（1章に1回まで）
+    function rollShocks() {
+      events.forEach((e) => {
+        if (!e.chance || s.shock[e.id] !== undefined) return;
+        if (rnd() < e.chance(s)) s.shock[e.id] = s.t;
+      });
     }
 
     // 対策（予兆）：情報源ごとの偏りがある知らせを流す。状態は変えない
@@ -245,6 +265,8 @@
       if (list.length) {
         pending = list[0];
         s.last[pending.id] = s.t;
+        if (pending.tension) s.lastTension = s.t;
+        if (pending.onStart) pending.onStart(api); // 選ぶ前に起きてしまう被害など
         return { type: 'event', event: pending };
       }
       monthly();
@@ -269,7 +291,8 @@
       const c = ev.choices[i];
       if (c.req && c.req(s)) return false;
       pending = null;
-      if (!c.hist) s.div += c.div !== undefined ? c.div : 3;
+      // 史実にない出来事（invented）での選択は、乖離度を上げない
+      if (!c.hist && !ev.invented) s.div += c.div !== undefined ? c.div : 3;
       const label = typeof c.label === 'function' ? c.label(s) : c.label;
       c.effect(api);
       log('【' + ev.title + '】' + label, 'choice');
@@ -282,7 +305,7 @@
     return { s, tick, choices, choose, textOf, getPending: () => pending };
   }
 
-  const exported = { createGame, ymLabel, END, ELECTION, clamp, makeRng, prematurity, donBlocks, indicators };
+  const exported = { createGame, ymLabel, END, ELECTION, clamp, makeRng, prematurity, donBlocks, indicators, calm };
   if (typeof module !== 'undefined' && module.exports) module.exports = exported;
   else root.REB = exported;
 })(typeof window !== 'undefined' ? window : globalThis);

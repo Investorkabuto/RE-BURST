@@ -8,5 +8,7 @@ module.exports = ({ by, hist }) => ({
   '逐次投入の泥沼': by({ mq1: /追い貸し/, mq2: /小規模/, more: /追加で投入/, media: /やけくそ/ }),
   '大量投入+裏金': by({ mq1: /追い貸し/, notebook: /読み/, mq2: /大規模|根回し/, fund: /裏金/ }),
   '改革派（追及・御堂・公表・離党）': by({ e107: /追及/, e111: /御堂/, e116: /公表/, e112: /政治改革/, e113: /新党/, fund: /政治改革/ }),
+  '順調すぎ（早期処理・減税・補助・治水を道路へ）': by({ notebook: /読み/, persuade: /手帳/, early: /資本注入/, boom: /減税/, inflation: /補助/, levee: /道路/, riot: /支援金/, mofPress: /突っぱね/ }),
+  '順調＋備え（早期処理・投資・治水・利上げ）': by({ notebook: /読み/, persuade: /手帳/, early: /資本注入/, boom: /重点投資/, inflation: /利上げ/, levee: /放水路/, mofPress: /歳出/ }),
   'ドン派（擁護・葛城・院政）': by({ mq1: /追い貸し/, e107: /擁護/, e111: /葛城/, shadow: /受け入れ/, fund: /長老/ })
 });
