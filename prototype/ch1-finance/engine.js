@@ -1,12 +1,11 @@
-// RE-BURST 試作：状態とルールで動くエンジン（第1章の金融の部分）
+// RE-BURST 試作：状態とルールで動くエンジン（第1章：金融と政局）
 // イベントは「条件が揃ったら起きる部品」。日付で固定せず、値の変化で出る・出ない・繰り返すが決まる。
+// 史実の出来事も、条件を満たさなければ起きない。
 (function (root) {
   'use strict';
 
   const END = 28;       // t=28 は 1993年8月。ここで終わる
   const ELECTION = 27;  // 1993年7月
-
-  const GAUGES = ['local', 'lead', 'scandal', 'tie', 'party', 'economy', 'fiscal', 'life', 'tech', 'damage', 'backlash', 'funding', 'chain', 'moral'];
 
   function ymLabel(t) {
     const m = 3 + t; // t=0 → 1991年4月
@@ -15,16 +14,44 @@
 
   function clamp(x, lo, hi) { return Math.max(lo, Math.min(hi, x)); }
 
-  function initialState() {
+  // 種から決まる乱数。同じ種なら同じ世界になる
+  function makeRng(seed) {
+    let a = (seed >>> 0) || 1;
+    return function () {
+      a = (a + 0x6D2B79F5) >>> 0;
+      let x = a;
+      x = Math.imul(x ^ (x >>> 15), x | 1);
+      x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
+      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // 対策B：遊ぶたびに世界が少し違う（揺れ幅は小さめ。史実の範囲内）
+  function makeWorld(rnd) {
+    const r = (c, w) => c + (rnd() * 2 - 1) * w;
+    return {
+      dmg0: r(25, 4),       // 金融の傷みの初期値
+      growth: r(1.7, 0.22), // 傷みの増え方
+      crashAt: r(50, 3),    // 株価が底割れする傷みの境目
+      donSpeed: r(2.0, 0.3) // ドンの疑惑が膨らむ速さ
+    };
+  }
+
+  function initialState(world) {
     return {
       t: 0,
+      world,
       v: {
         // プレイヤー個人
         local: 55,     // 地元の支持
         lead: 45,      // 求心力
         scandal: 10,   // スキャンダル
         tie: 20,       // しがらみ
+        image: 30,     // 改革派の評価
         money: 100,    // 金（億円）
+        // 人
+        donRel: 70,    // ドンとの関係
+        nishina: 70,   // 仁科の忠誠
         // 党
         party: 50,     // 党の支持率
         // 国
@@ -32,28 +59,44 @@
         fiscal: 60,    // 財政（高いほど健全）
         life: 56,      // 暮らしの実感
         tech: 50,      // 技術力
-        // 隠れた値
-        damage: 25,    // 金融の傷み
+        // 隠れた値（画面には出さない。予兆から読み取る）
+        damage: world.dmg0, // 金融の傷み
         gm: 0,         // 傷みの増え方の補正
         backlash: 0,   // 救済への批判
         funding: 100,  // 資金調達力（企業献金・パーティ収入の倍率）
         chain: 0,      // 連鎖倒産の勢い
-        moral: 0       // モラルハザード（緩み）
+        moral: 0,      // モラルハザード（緩み）
+        aware: 8,      // 世論の危機認識
+        donScandal: 35,// ドンの疑惑（捜査と報道の進み具合）
+        reform: 20     // 政治改革を求める世論
       },
+      // ドンの状態。stance は公的資金への立場、status は立場の変化
+      don: { stance: 'oppose', status: 'active' }, // oppose/neutral ・ active/resigned/arrested/shadow
       inj: { count: 0, total: 0, last: -99 },
       flags: {},
       last: {},          // イベントごとの最後に起きた月
       topics: { bailout: 'open' }, // 案件の状態：open（未解決）/ resolved（解決済み）/ relapse（再燃）
       queue: [],         // 遅れて出る効果
       log: [],
+      news: [],          // 予兆（情報源からの知らせ）
       hist: [],
       div: 0,            // 乖離度
       over: null
     };
   }
 
-  function createGame(events) {
-    const s = initialState();
+  // 対策A：世論がまだ危機を感じていないうちに手を打つほど、反発が大きい（0〜1）
+  function prematurity(s) { return clamp((45 - s.v.aware) / 45, 0, 1); }
+  // 対策C：ドンが健在で、公的資金に反対している
+  function donBlocks(s) { return s.don.stance === 'oppose' && (s.don.status === 'active' || s.don.status === 'shadow'); }
+
+  function createGame(events, opts) {
+    opts = opts || {};
+    const seed = opts.seed != null ? opts.seed : Math.floor(Math.random() * 100000);
+    const rnd = makeRng(seed);
+    const s = initialState(makeWorld(rnd));
+    s.seed = seed;
+    const omens = opts.omens || [];
     let pending = null;
 
     function log(msg, kind) { s.log.push({ t: s.t, msg, kind: kind || 'info' }); }
@@ -63,20 +106,30 @@
       s.v[key] = clamp(s.v[key], 0, 100);
     }
     function later(months, msg, fn) { s.queue.push({ at: s.t + months, msg, fn }); }
-    const api = { s, add, later, log, inject };
+    const api = { s, add, later, log, inject, prematurity: () => prematurity(s), donBlocks: () => donBlocks(s), rnd };
 
     // 公的資金の投入。逐次投入は効果が7割になり、批判が加算される
-    function inject(S, opts) {
-      const nodisc = opts && opts.nodisc;
+    function inject(S, opts2) {
+      const nodisc = opts2 && opts2.nodisc;
       const sequential = s.inj.count >= 1 && !nodisc;
       const eff = S * (sequential ? 0.7 : 1);
+      const p = prematurity(s);
       add('damage', -eff * 1.7);
       add('chain', -eff * 2);
       add('fiscal', -S * 0.7);
-      add('backlash', S * 2.4 + (sequential ? 8 : 0));
+      add('backlash', S * 2.4 + (sequential ? 8 : 0) + S * 1.6 * p + 6 * p);
       add('moral', S * 0.3);
-      add('party', -S * 0.6);
+      add('party', -S * 0.6 - 3 * p);
       add('economy', -S * 0.25);
+      if (p > 0.3) {
+        add('lead', -5 * p); add('local', -4 * p);
+        log('世間はまだ危機を感じていない。「危機を煽った」「銀行のための税金だ」と批判された', 'bad');
+      }
+      if (donBlocks(s)) {
+        add('donRel', -12); add('funding', -8); add('nishina', -5);
+        log('ドンの反対を押し切った。権藤派の資金の流れが細った', 'bad');
+      }
+      add('aware', S * 0.8 + 4); // 投入そのものが、世間に危機を知らせる
       later(6, '投入の効果が景気に出始めた', () => add('economy', eff * 0.8));
       s.inj.count += 1; s.inj.total += S; s.inj.last = s.t;
       s.div += S >= 10 ? 8 : 5;
@@ -84,8 +137,8 @@
 
     // 月ごとの動き（イベントがなくても国は動く）
     function monthly() {
-      const v = s.v;
-      const growth = Math.max(0, (1.7 + v.gm + v.moral * 0.01) * (1 - v.damage / 130));
+      const v = s.v, w = s.world;
+      const growth = Math.max(0, (w.growth + v.gm + v.moral * 0.01) * (1 - v.damage / 130));
       v.damage = clamp(v.damage + growth, 0, 100);
       if (v.damage >= 52) v.chain = clamp(v.chain + (v.damage - 48) * 0.3, 0, 60);
       else v.chain = v.chain * 0.9;
@@ -95,15 +148,43 @@
       v.life = clamp(v.life + (lt - v.life) * 0.08, 0, 100);
       v.fiscal = clamp(v.fiscal - 0.08 - (v.economy < 45 ? 0.1 : 0) + (v.economy > 60 ? 0.05 : 0), 0, 100);
       v.backlash = v.backlash * 0.97;
-      const pt = 50 + (v.economy - 50) * 0.35 - v.backlash * 0.25 - v.scandal * 0.1;
+      // 世論の危機認識は、本当の傷みより遅れて追いつく
+      const at = clamp((v.damage - 30) * 1.3 + v.chain * 1.2 + (s.flags.crash ? 20 : 0), 0, 100);
+      v.aware = clamp(v.aware + (at - v.aware) * 0.07, 0, 100);
+      // ドンの疑惑は、何もしなければ膨らむ
+      if (s.don.status === 'active') v.donScandal = clamp(v.donScandal + w.donSpeed * (s.flags.defended ? 0.85 : 1), 0, 100);
+      if (s.flags.e107) v.reform = clamp(v.reform + 0.6, 0, 100);
+      v.reform = clamp(v.reform - 0.15, 0, 100);
+      const scandalDrag = s.flags.e107 && s.don.status !== 'arrested' ? Math.max(0, v.donScandal - 50) * 0.08 : 0;
+      const pt = 50 + (v.economy - 50) * 0.35 - v.backlash * 0.25 - v.scandal * 0.1 - scandalDrag - Math.max(0, v.reform - 40) * 0.1;
       v.party = clamp(v.party + (pt - v.party) * 0.06, 0, 100);
-      const ft = 100 - v.backlash * 1.0 - Math.max(0, 50 - v.party) * 2.2 - v.scandal * 0.2;
+      const ft = 100 - v.backlash * 1.0 - Math.max(0, 50 - v.party) * 2.2 - v.scandal * 0.2 - (s.flags.donCut ? 12 : 0);
       v.funding = clamp(v.funding + (ft - v.funding) * 0.15, 0, 100);
       v.money += v.funding * 0.12 - 9;
       v.scandal = Math.max(0, v.scandal - 0.25);
-      v.local = clamp(v.local + (v.party - 50) * 0.02 - Math.max(0, 45 - v.economy) * 0.04, 0, 100);
+      // 地元の支持は、景気と党の支持率に向かってゆっくり戻る（国を良くすれば、地元もいずれ付いてくる）
+      const lct = 52 + (v.economy - 50) * 0.5 + (v.party - 50) * 0.4;
+      v.local = clamp(v.local + (lct - v.local) * 0.04, 0, 100);
       v.moral = v.moral * 0.99;
-      s.hist.push({ t: s.t, economy: v.economy, damage: v.damage, fiscal: v.fiscal, party: v.party, funding: v.funding, chain: v.chain });
+      s.hist.push({ t: s.t, economy: v.economy, damage: v.damage, fiscal: v.fiscal, party: v.party, life: v.life, aware: v.aware });
+      omen();
+    }
+
+    // 対策（予兆）：情報源ごとの偏りがある知らせを流す。状態は変えない
+    function omen() {
+      if (!omens.length || rnd() > 0.6) return;
+      const lastSrc = s.news.length ? s.news[s.news.length - 1].src : null;
+      const cands = omens.filter(o => o.src !== lastSrc && (!o.when || o.when(s)));
+      for (let k = 0; k < 4 && cands.length; k++) {
+        const i = Math.floor(rnd() * cands.length);
+        const o = cands.splice(i, 1)[0];
+        const m = o.say(s, rnd);
+        if (!m) continue;
+        const used = s.news.some(n => n.msg === m.text);
+        if (used) continue;
+        s.news.push({ t: s.t, src: o.src, msg: m.text, tone: m.tone || 'calm' });
+        return;
+      }
     }
 
     function runQueue() {
@@ -153,9 +234,16 @@
       return { type: 'month' };
     }
 
+    function textOf(ev) { return typeof ev.text === 'function' ? ev.text(s) : ev.text; }
+
     function choices() {
       if (!pending) return [];
-      return pending.choices.map((c, i) => ({ i, label: c.label, note: c.note || '', block: c.req ? c.req(s) : null }));
+      return pending.choices.map((c, i) => ({
+        i,
+        label: typeof c.label === 'function' ? c.label(s) : c.label,
+        note: typeof c.note === 'function' ? c.note(s) : (c.note || ''),
+        block: c.req ? c.req(s) : null
+      }));
     }
 
     function choose(i) {
@@ -164,18 +252,19 @@
       if (c.req && c.req(s)) return false;
       pending = null;
       if (!c.hist) s.div += c.div !== undefined ? c.div : 3;
+      const label = typeof c.label === 'function' ? c.label(s) : c.label;
       c.effect(api);
-      log('【' + ev.title + '】' + c.label, 'choice');
+      log('【' + ev.title + '】' + label, 'choice');
       // イベントの直後に時間が進む（同じ月に何度も出続けないように）
       monthly();
       s.t += 1;
       return true;
     }
 
-    return { s, tick, choices, choose, getPending: () => pending };
+    return { s, tick, choices, choose, textOf, getPending: () => pending };
   }
 
-  const exported = { createGame, ymLabel, GAUGES, END, ELECTION, clamp };
+  const exported = { createGame, ymLabel, END, ELECTION, clamp, makeRng, prematurity, donBlocks };
   if (typeof module !== 'undefined' && module.exports) module.exports = exported;
   else root.REB = exported;
 })(typeof window !== 'undefined' ? window : globalThis);

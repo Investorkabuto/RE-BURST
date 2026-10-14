@@ -1,23 +1,31 @@
 // イベントの部品。when（起きる条件）と choices（選択肢と状態の変化）だけで書く。
 // hist: true は「史実に近い選択」（乖離度が上がらない）。
+// 史実の出来事（ドンの辞職・逮捕、内閣不信任案、株価の底割れ）も、条件を満たさなければ起きない。
 (function (root) {
   'use strict';
 
+  const donBlocks = (s) => s.don.stance === 'oppose' && (s.don.status === 'active' || s.don.status === 'shadow');
   const needLead = (n) => (s) => s.v.lead >= n ? null : '求心力が足りない（' + n + '以上が必要）';
+  // 公的資金に必要な求心力：父の手帳などで下がり、ドンが反対していると上がる
+  const needFund = (base) => (s) => {
+    const n = base - (s.flags.fundBias ? 10 : 0) + (donBlocks(s) ? 10 : 0);
+    return s.v.lead >= n ? null : '求心力が足りない（' + n + '以上が必要' + (donBlocks(s) ? '。ドンが反対している' : '') + '）';
+  };
+  const donNote = (s) => donBlocks(s) ? '／ドンの反対を押し切ることになる（ドンとの関係↓ 資金↓）' : '';
 
   const events = [
     // ---- 北陽銀行のメインクエスト ----
     {
       id: 'mq1', title: 'MQ-1 頭取の再訪', once: true, priority: 50,
       when: (s) => s.t >= 2,
-      text: '北陽銀行の頭取が執務室に来る。「地価の下落で、融資先の不動産会社が返済できません。このままでは決算が持ちません」。父の代からの後援会の柱だ。',
+      text: '北陽銀行の頭取が執務室に来る。「地価の下落で、融資先の不動産会社が返済できません。このままでは決算が持ちません」。父の代からの後援会の柱で、権藤派の金庫にもつながっている。',
       choices: [
-        { label: '大蔵省に口を利き、追い貸しを認めさせる', hist: true, note: '地元の支持↑ 金↑ しがらみ↑／傷みが隠れたまま膨らむ',
-          effect: (g) => { g.add('local', 6); g.add('money', 15); g.add('tie', 8); g.s.v.gm += 0.6; g.s.flags.forbear = true; } },
-        { label: '大蔵省の検査を促し、損失を早めに表に出させる', note: '地元の支持↓↓ 献金↓／傷みの増え方が緩む',
-          effect: (g) => { g.add('local', -10); g.add('money', -8); g.add('tie', -6); g.add('damage', -10); g.s.v.gm -= 0.5; g.s.flags.inspect = true; } },
+        { label: '大蔵省に口を利き、追い貸しを認めさせる', hist: true, note: '地元の支持↑ 金↑ しがらみ↑ ドンとの関係↑／傷みが隠れたまま膨らむ',
+          effect: (g) => { g.add('local', 6); g.add('money', 15); g.add('tie', 8); g.add('donRel', 4); g.s.v.gm += 0.6; g.s.flags.forbear = true; } },
+        { label: '大蔵省の検査を促し、損失を早めに表に出させる', note: '地元の支持↓↓ 献金↓ ドンとの関係↓／傷みの増え方が緩む。世間が危機に気づき始める',
+          effect: (g) => { g.add('local', -10); g.add('money', -8); g.add('tie', -6); g.add('donRel', -8); g.add('image', 6); g.add('damage', -10); g.add('aware', 8); g.s.v.gm -= 0.5; g.s.flags.inspect = true; } },
         { label: '他の銀行との合併を仲介する', note: '求心力が高ければ傷みが減る（8か月後に判明）',
-          effect: (g) => { g.add('lead', -3); g.add('damage', -5); g.s.v.gm -= 0.3; g.s.flags.merge = true;
+          effect: (g) => { g.add('lead', -3); g.add('damage', -5); g.add('aware', 3); g.s.v.gm -= 0.3; g.s.flags.merge = true;
             g.later(8, null, (h) => { if (h.s.v.lead >= 40) { h.add('damage', -8); h.log('合併が軌道に乗り、傷みが減った', 'delayed'); } else { h.add('damage', 6); h.log('合併先の統合が混乱し、傷みが増えた', 'delayed'); } }); } },
         { label: '（何もしない）', hist: true, effect: () => {} }
       ]
@@ -38,11 +46,41 @@
     {
       id: 'notebook', title: 'E1-15 未完の手帳', once: true, priority: 40,
       when: (s) => s.t >= 4,
-      text: '仁科と父の遺品を整理していると、書きかけの手帳が出てくる。銀行の不良債権を早めに処理する構想が、父の字でびっしり書かれている。日付は倒れる前の週で止まっている。',
+      text: '仁科と父の遺品を整理していると、書きかけの手帳が出てくる。銀行の不良債権を早めに処理する構想が、父の字でびっしり書かれている。日付は倒れる前の週で止まっている。余白に一行だけ、「権藤さんを説得できるか」。',
       choices: [
-        { label: '自分で読み、仁科に預ける', note: '求心力+5／公的資金に必要な求心力が下がる',
-          effect: (g) => { g.add('lead', 5); g.s.flags.fundBias = true; g.s.flags.notebook = true; } },
+        { label: '自分で読み、仁科に預ける', note: '求心力+5 仁科の忠誠↑／公的資金に必要な求心力が下がる。ドンを説得する材料になる',
+          effect: (g) => { g.add('lead', 5); g.add('nishina', 5); g.s.flags.fundBias = true; g.s.flags.notebook = true; } },
         { label: '封印する', hist: true, effect: () => {} }
+      ]
+    },
+
+    // ---- 対策C：ドンを説得する（大きな代償付き） ----
+    {
+      id: 'persuade', topic: 'bailout', title: 'ドンの屋敷にて（公的資金をめぐる説得）', cooldown: 6, priority: 46,
+      when: (s) => s.don.status === 'active' && s.don.stance === 'oppose' && !s.flags.crash && s.t >= 5 &&
+        (s.flags.notebook || s.v.aware >= 25) && s.v.damage >= 33 && (s.flags.persuadeTries || 0) < 2,
+      text: (s) => '目白の屋敷で、権藤 嘉平は鯉に餌をやりながら言う。「銀行に税金を入れる？　龍三郎の倅が、何を青いことを。銀行はな、わしらの金庫だ。金庫に穴を開けて誰が得をする」。' +
+        (s.flags.persuadeFailed ? '前に来たときより、笑顔が薄い。' : '好々爺の笑顔は崩れない。'),
+      choices: [
+        { label: '父の手帳を見せ、父の遺志として頼む', req: (s) => s.flags.notebook ? null : '父の手帳を読んでいない',
+          note: (s) => 'ドンとの関係と仁科の忠誠しだいで成否が分かれる。成功すれば、ドンは反対をやめるが「借り」が残る（しがらみ↑↑ 改革派の評価↓）',
+          effect: (g) => {
+            const s = g.s; s.flags.persuadeTries = (s.flags.persuadeTries || 0) + 1;
+            const power = s.v.donRel + (s.v.nishina >= 60 ? 10 : 0);
+            if (power >= 70) {
+              s.don.stance = 'neutral'; s.flags.donDebt = true;
+              g.add('tie', 12); g.add('image', -8); g.add('donRel', 5); g.add('lead', 3);
+              g.log('ドンは手帳を長く眺め、「好きにせえ。ただし、この借りは返してもらう」と言った', 'delayed');
+            } else {
+              s.flags.persuadeFailed = true; g.add('donRel', -10);
+              g.log('ドンは手帳を閉じた。「龍三郎も、あの夜、同じことを言った」', 'bad');
+            }
+          } },
+        { label: '裏金リストを持ち出し、取引を迫る', note: '必ず反対をやめさせる。ドンとの関係↓↓ 仁科の忠誠↓↓ スキャンダル↑（脅しは記録に残る）', div: 6,
+          effect: (g) => { const s = g.s; s.flags.persuadeTries = (s.flags.persuadeTries || 0) + 1; s.don.stance = 'neutral'; s.flags.blackmail = true;
+            g.add('donRel', -25); g.add('nishina', -15); g.add('scandal', 10); g.add('lead', 4);
+            g.log('ドンは笑ったまま言った。「お前の父親も同じ穴の狢だったな」', 'bad'); } },
+        { label: '今日は引き下がる', hist: true, effect: () => {} }
       ]
     },
 
@@ -50,10 +88,18 @@
     {
       id: 'early', topic: 'bailout', title: '早期処理の機会（地銀再編と限定的な資本注入）', once: true, priority: 45,
       when: (s) => !s.flags.crash && !s.flags.mq2 && s.v.damage >= 35 && s.v.damage < 58 && s.t >= 6,
-      text: '大蔵省の若手が小声で言う。「今なら約2兆円と地銀の再編で、傷を小さいうちに塞げます。1年後には桁が変わります」。まだ世間は危機を感じていない。',
+      text: (s) => '大蔵省の若手が小声で言う。「今なら約2兆円と地銀の再編で、傷を小さいうちに塞げます。1年後には桁が変わります」。' +
+        (s.v.aware < 25 ? 'ただ、世間はまだ危機を感じていない。今動けば「危機を煽る」と言われるだろう。' : '世間も、ようやく銀行の話をし始めている。'),
       choices: [
-        { label: '約2兆円の資本注入と地銀再編を主導する', note: '財政↓ 批判↑（小）／傷みが大きく減り、増え方も緩む', req: needLead(40), div: 4,
-          effect: (g) => { g.add('damage', -18); g.add('fiscal', -2.5); g.add('backlash', 6); g.add('lead', 3); g.s.v.gm -= 0.4; g.s.flags.early = true; } },
+        { label: '約2兆円の資本注入と地銀再編を主導する', req: needFund(50), div: 4,
+          note: (s) => '財政↓ 批判↑／傷みが大きく減り、増え方も緩む' + (s.v.aware < 25 ? '。世間の危機認識が低いほど、反発と求心力の損失が大きい' : '') + donNote(s),
+          effect: (g) => {
+            const s = g.s, p = g.prematurity();
+            g.add('damage', -18); g.add('fiscal', -2.5); g.add('backlash', 6 + 22 * p); g.add('lead', 3 - 10 * p); g.add('party', -4 * p); g.add('local', -6 * p);
+            g.add('image', 6); g.add('aware', 10); s.v.gm -= 0.4; s.flags.early = true;
+            if (p > 0.3) g.log('「なぜ今、銀行に税金を」。危機を知らない世間から、強い反発が出た', 'bad');
+            if (donBlocks(s)) { g.add('donRel', -15); g.add('nishina', -5); s.flags.donCut = true; g.log('ドンの反対を押し切った。権藤派の資金の流れが細った', 'bad'); }
+          } },
         { label: '見送る（世論が動いてからにする）', hist: true, effect: () => {} }
       ]
     },
@@ -63,43 +109,44 @@
       text: '金融の傷が浅く、景気にも余力がある。財界は設備投資を口にし、役所は「今なら打てる手が多い」と言う。',
       choices: [
         { label: '国内の技術と人材に重点投資する', note: '財政↓ 技術力↑↑／景気が遅れて伸びる',
-          effect: (g) => { g.add('fiscal', -3); g.add('tech', 8); g.later(10, '技術投資が実り、景気が伸びた', (h) => h.add('economy', 4)); } },
-        { label: '財政を立て直す', note: '財政↑ 景気↓（小）', effect: (g) => { g.add('fiscal', 6); g.add('economy', -1); } },
+          effect: (g) => { g.add('fiscal', -3); g.add('tech', 8); g.s.flags.boom = true; g.later(10, '技術投資が実り、景気が伸びた', (h) => h.add('economy', 4)); } },
+        { label: '財政を立て直す', note: '財政↑ 景気↓（小）', effect: (g) => { g.add('fiscal', 6); g.add('economy', -1); g.s.flags.boom = true; } },
         { label: '減税で暮らしを支える', note: '暮らし↑ 党の支持率↑ 財政↓',
-          effect: (g) => { g.add('life', 5); g.add('party', 3); g.add('fiscal', -4); } }
+          effect: (g) => { g.add('life', 5); g.add('party', 3); g.add('fiscal', -4); g.s.flags.boom = true; } }
       ]
     },
 
     // ---- 大きな事件：傷みが大きくなったときだけ起きる ----
     {
       id: 'crash', title: 'E1-10 株価の底割れと経済対策', once: true, priority: 60,
-      when: (s) => !s.flags.crash && s.v.damage >= 50,
-      text: '日経平均が急落する。市場は不良債権の処理が遅れていると見ている。党は大型の経済対策を作る。',
+      when: (s) => !s.flags.crash && s.v.damage >= s.world.crashAt,
+      text: '日経平均が急落する。市場は不良債権の処理が遅れていると見ている。新聞の一面が初めて「銀行」の二文字で埋まる。党は大型の経済対策を作る。',
       choices: [
-        { label: '公共事業を中心にした大型の対策', hist: true, note: '景気↑（短期）財政↓↓',
-          effect: (g) => { g.add('economy', -6); g.add('fiscal', -8); g.add('economy', 4); g.add('local', 4); g.add('chain', 20); g.s.flags.crash = true; } },
-        { label: '減税を中心にした対策', note: '暮らし↑ 財政↓↓',
-          effect: (g) => { g.add('economy', -6); g.add('fiscal', -8); g.add('life', 4); g.add('chain', 20); g.s.flags.crash = true; } },
-        { label: '小規模にとどめ、財源を不良債権の処理に回す', note: '景気↓／公的資金の投入に必要な求心力が下がる',
-          effect: (g) => { g.add('economy', -9); g.add('money', -5); g.add('chain', 20); g.s.flags.crash = true; g.s.flags.fundBias = true; } }
+        { label: '公共事業を中心にした大型の対策', hist: true, note: '景気↓（小）財政↓↓ 地元の支持↑',
+          effect: (g) => { g.add('economy', -2); g.add('fiscal', -8); g.add('local', 4); g.add('chain', 20); g.add('aware', 25); g.s.flags.crash = true; } },
+        { label: '減税を中心にした対策', note: '景気↓ 暮らし↑ 財政↓↓',
+          effect: (g) => { g.add('economy', -6); g.add('fiscal', -8); g.add('life', 4); g.add('chain', 20); g.add('aware', 25); g.s.flags.crash = true; } },
+        { label: '小規模にとどめ、財源を不良債権の処理に回す', note: '景気↓↓／公的資金の投入に必要な求心力が下がる',
+          effect: (g) => { g.add('economy', -9); g.add('money', -5); g.add('chain', 20); g.add('aware', 25); g.add('image', 4); g.s.flags.crash = true; g.s.flags.fundBias = true; } }
       ]
     },
     {
       id: 'mq2', topic: 'bailout', title: 'MQ-2 公的資金の早期投入論', cooldown: 1, priority: 58,
       when: (s) => s.flags.crash && !s.flags.mq2,
-      text: '総理が「金融機関に公的資金を入れてでも、不良債権を処理すべきだ」と発言するが、銀行業界、財界、大蔵省、世論がそろって反発する。規模を選ぶ。小さすぎれば止まらず、大きすぎれば財政と支持率が先に傷む。',
+      text: (s) => '総理が「金融機関に公的資金を入れてでも、不良債権を処理すべきだ」と発言するが、銀行業界、財界、大蔵省、世論がそろって反発する。規模を選ぶ。小さすぎれば止まらず、大きすぎれば財政と支持率が先に傷む。' +
+        (donBlocks(s) ? '派閥の会合では、ドンが「銀行に税金を入れる話は、わしは聞いとらん」と釘を刺した。' : ''),
       choices: [
-        { label: '投入する：小規模（約3兆円）', req: (s) => needLead(s.flags.fundBias ? 20 : 30)(s), div: 5,
-          note: '傷み↓ 批判↑（小）／取りこぼしが出やすい', effect: (g) => { g.s.flags.mq2 = true; g.inject(3); } },
-        { label: '投入する：中規模（約8兆円）', req: (s) => needLead(s.flags.fundBias ? 40 : 50)(s), div: 8,
-          note: '傷み↓↓ 財政↓ 批判↑', effect: (g) => { g.s.flags.mq2 = true; g.inject(8); } },
-        { label: '投入する：大規模（約16兆円）', req: (s) => needLead(s.flags.fundBias ? 55 : 65)(s), div: 12,
-          note: '連鎖倒産はほぼ止まる。財政↓↓↓ 批判↑↑ 支持率↓', effect: (g) => { g.s.flags.mq2 = true; g.inject(16); } },
+        { label: '投入する：小規模（約3兆円）', req: needFund(30), div: 5,
+          note: (s) => '傷み↓ 批判↑（小）／取りこぼしが出やすい' + donNote(s), effect: (g) => { g.s.flags.mq2 = true; g.inject(3); } },
+        { label: '投入する：中規模（約8兆円）', req: needFund(50), div: 8,
+          note: (s) => '傷み↓↓ 財政↓ 批判↑' + donNote(s), effect: (g) => { g.s.flags.mq2 = true; g.inject(8); } },
+        { label: '投入する：大規模（約16兆円）', req: needFund(65), div: 12,
+          note: (s) => '連鎖倒産はほぼ止まる。財政↓↓↓ 批判↑↑ 支持率↓' + donNote(s), effect: (g) => { g.s.flags.mq2 = true; g.inject(16); } },
         { label: '先に党内の根回しに回る（金30億・求心力+12、来月もう一度判断する）', req: (s) => (s.flags.lobby || 0) >= 2 ? '根回しはこれ以上効かない' : (s.v.money < 30 ? '金が足りない' : null),
           note: '時間がかかる。その間も傷みは増える', div: 0,
           effect: (g) => { g.add('money', -30); g.add('lead', 12); g.add('tie', 4); g.s.flags.lobby = (g.s.flags.lobby || 0) + 1; } },
-        { label: '反対する（銀行業界と大蔵省の側に付く）', hist: true, note: '献金↑ しがらみ↑／傷みは放置される',
-          effect: (g) => { g.s.flags.mq2 = true; g.s.flags.refused = true; g.add('money', 12); g.add('tie', 6); } }
+        { label: '反対する（銀行業界と大蔵省の側に付く）', hist: true, note: '献金↑ しがらみ↑ ドンとの関係↑／傷みは放置される',
+          effect: (g) => { g.s.flags.mq2 = true; g.s.flags.refused = true; g.add('money', 12); g.add('tie', 6); g.add('donRel', 5); } }
       ]
     },
 
@@ -109,7 +156,7 @@
       when: (s) => s.v.chain >= 8 && s.inj.count === 0,
       text: '弱い銀行が倒れると、その銀行から借りていた不動産会社が倒れ、下請けの建設会社や商店が倒れる。取引先の信用不安が次の銀行に飛び火する。頭取が青ざめて来る。「うちの取引先の4社が、同じ週に手形を落とせません」。',
       choices: [
-        { label: '連鎖を止めるため、公的資金を入れる（約3兆円）', req: needLead(30), note: '今から入れる。遅れた分、傷みは深い',
+        { label: '連鎖を止めるため、公的資金を入れる（約3兆円）', req: needFund(30), note: (s) => '今から入れる。遅れた分、傷みは深い' + donNote(s),
           effect: (g) => { g.s.flags.mq2 = true; g.inject(3); } },
         { label: '破綻した銀行を整理し、健全な銀行に営業を引き継がせる', note: '景気↓ 暮らし↓／批判は出ない 求心力↑',
           effect: (g) => { g.add('economy', -6); g.add('life', -4); g.add('damage', -8); g.add('lead', 3); g.s.v.chain *= 0.4; g.s.flags.liquidate = true; } },
@@ -125,7 +172,7 @@
       text: '総理は言う。「あと少しで止まる」。党内は割れる。「ここで止めたら、これまでの金は無駄になる」「いや、もう止めよう」。大蔵省の担当者が示す追加の額は、前回より大きい。逐次投入は効果が7割になり、批判が積み重なる。',
       choices: [
         { label: '追加で投入する（約3兆円）', req: needLead(25), note: '効果は7割・批判が加算される', effect: (g) => { g.inject(3); } },
-        { label: '一気に大規模に切り替える（約14兆円）', req: needLead(55), div: 8, note: '割増なし。財政↓↓ 批判↑↑',
+        { label: '一気に大規模に切り替える（約14兆円）', req: needFund(55), div: 8, note: '割増なし。財政↓↓ 批判↑↑',
           effect: (g) => { g.s.flags.bigbang = true; g.s.flags.media = true; g.inject(14, { nodisc: true }); } },
         { label: '投入を打ち切り、破綻整理に移る', note: '景気↓↓（短期）批判は消える',
           effect: (g) => { g.add('economy', -7); g.add('life', -4); g.add('damage', -6); g.add('backlash', -15); g.add('lead', 2); g.s.v.chain *= 0.4; g.s.flags.liquidate = true; g.s.inj.count = 3; g.s.flags.media = true; } },
@@ -155,38 +202,148 @@
       text: '見出しが「銀行を税金で救うのか」に変わる。住宅ローンに苦しむ人、救済から外れた取引先、経営努力をしてきた同業の他行からも「なぜあの銀行だけ」と不満が出る。党本部の電話が鳴り止まない。',
       choices: [
         { label: '経営陣の責任追及と、給与・配当の制限を条件にする', note: '批判↓ 資金調達力↓（業界が反発）モラル↓',
-          effect: (g) => { g.add('backlash', -14); g.add('funding', -10); g.add('moral', -8); g.add('tie', -4); } },
+          effect: (g) => { g.add('backlash', -14); g.add('funding', -10); g.add('moral', -8); g.add('tie', -4); g.add('image', 4); } },
         { label: '条件を付けず、混乱を抑えることを優先する', note: '党の支持率↓ モラル↑',
           effect: (g) => { g.add('party', -5); g.add('moral', 6); } },
         { label: '中小企業向けの資金繰り支援も同時に出す', note: '財政↓ 批判↓ 地元の支持↑',
           effect: (g) => { g.add('fiscal', -3); g.add('backlash', -12); g.add('local', 4); } },
-        { label: '自ら党と街頭で説明に立つ', note: '時間と金を使う。批判が少し和らぐ',
-          effect: (g) => { g.add('backlash', -7); g.add('lead', 2); g.add('money', -3); } },
+        { label: '自ら党と街頭で説明に立つ', note: '時間と金を使う。批判が少し和らぐ。世間の危機認識↑',
+          effect: (g) => { g.add('backlash', -7); g.add('lead', 2); g.add('money', -3); g.add('aware', 6); } },
         { label: '（何もしない）', hist: true, effect: (g) => { g.add('party', -3); } }
       ]
     },
     {
       id: 'fund', title: 'E1-21 資金の枯渇', once: true, priority: 53,
       when: (s) => s.v.funding <= 70 && s.t >= 6,
-      text: '財界の会合から、名前が消える。「銀行を救った政権に出す金はない」「救われなかった側が怒っている」。パーティ券の売れ行きが落ち、企業献金の約束が取り消される。鬼塚が帳簿を持ってくる。「先生、このままでは選挙が持ちません」。',
+      text: (s) => '財界の会合から、名前が消える。' + (s.flags.donCut ? '「権藤先生に逆らった人には、ちょっと」。' : '「銀行を救った政権に出す金はない」「救われなかった側が怒っている」。') +
+        'パーティ券の売れ行きが落ち、企業献金の約束が取り消される。鬼塚が帳簿を持ってくる。「先生、このままでは選挙が持ちません」。',
       choices: [
         { label: '経費を削り、後援会の個人献金と小口のパーティで回す', note: '苦しいがきれいなまま',
-          effect: (g) => { g.add('money', 5); g.add('local', 2); g.add('tie', -3); g.s.flags.cleanFund = true; } },
-        { label: '派閥の長老に頭を下げ、資金を借りる', note: '金↑ しがらみ↑↑ 求心力↓',
-          effect: (g) => { g.add('money', 35); g.add('tie', 12); g.add('lead', -3); } },
-        { label: '机の中の裏金リストに手を出す', note: '金↑↑ スキャンダル↑↑（後で響く）',
-          effect: (g) => { g.add('money', 50); g.add('scandal', 18); g.s.flags.blackfund = true; } },
-        { label: '献金に頼らない政治改革を進める', note: '支持率↑（小）金↓ 求心力↑',
-          effect: (g) => { g.add('party', 2); g.add('money', -10); g.add('lead', 3); g.s.flags.reform = true; } },
+          effect: (g) => { g.add('money', 5); g.add('local', 2); g.add('tie', -3); g.add('image', 3); g.s.flags.cleanFund = true; } },
+        { label: '派閥の長老に頭を下げ、資金を借りる', note: '金↑ しがらみ↑↑ 求心力↓ ドンとの関係↑',
+          effect: (g) => { g.add('money', 35); g.add('tie', 12); g.add('lead', -3); g.add('donRel', 6); } },
+        { label: '机の中の裏金リストに手を出す', note: '金↑↑ スキャンダル↑↑（後で響く） 仁科の忠誠↑',
+          effect: (g) => { g.add('money', 50); g.add('scandal', 18); g.add('nishina', 5); g.s.flags.blackfund = true; } },
+        { label: '献金に頼らない政治改革を進める', note: '支持率↑（小）金↓ 求心力↑ 改革派の評価↑',
+          effect: (g) => { g.add('party', 2); g.add('money', -10); g.add('lead', 3); g.add('image', 8); g.add('reform', 4); g.s.flags.reform = true; } },
         { label: '（何もしない）', hist: true, effect: (g) => { g.add('money', -10); } }
+      ]
+    },
+
+    // ---- ドンをめぐる政局（第1章の縦糸） ----
+    {
+      id: 'e107', title: 'E1-07 ドンの献金疑惑', once: true, priority: 62,
+      when: (s) => s.don.status === 'active' && s.v.donScandal >= 55,
+      text: (s) => '大手運送会社から権藤 嘉平への巨額の献金が、新聞の一面に載る。父もこの会社と付き合いがあった。派閥の会合で、ドンは「知らん。秘書が勝手にやったことだ」と笑う。仁科がこちらの顔を見ている。' +
+        (s.flags.blackmail ? '屋敷での脅しを、ドンは忘れていない。' : ''),
+      choices: [
+        { label: 'ドンを擁護する', hist: true, note: '求心力↑（派閥内） ドンとの関係↑ 仁科の忠誠↑ 党の支持率↓ 改革派の評価↓／疑惑の膨らみが遅くなる。逮捕されれば巻き込まれる',
+          effect: (g) => { const s = g.s; s.flags.e107 = true; s.flags.defended = true; g.add('lead', 4); g.add('donRel', 10); g.add('nishina', 10); g.add('party', -3); g.add('image', -6); g.add('donScandal', -4); g.add('reform', 8); } },
+        { label: '距離を置く', note: '変化は小さい。ドンとの関係↓',
+          effect: (g) => { g.s.flags.e107 = true; g.s.flags.distanced = true; g.add('donRel', -8); g.add('image', 3); g.add('reform', 10); } },
+        { label: '捜査への協力や、党内での追及に回る', note: '改革派の評価↑↑ 求心力↓↓ ドンとの関係↓↓↓ 仁科の忠誠↓↓／疑惑が一気に進む',
+          effect: (g) => { const s = g.s; s.flags.e107 = true; s.flags.pursued = true; g.add('image', 15); g.add('lead', -10); g.add('donRel', -30); g.add('nishina', -20); g.add('donScandal', 12); g.add('reform', 14); g.add('party', 2);
+            g.log('ドンが電話口で言った。「お前の父親も同じ穴の狢だった。忘れるな」', 'bad'); g.add('scandal', 5); } }
+      ]
+    },
+    {
+      id: 'e111', title: 'E1-11 ドンの議員辞職と派閥の跡目争い', once: true, priority: 63,
+      when: (s) => s.don.status === 'active' && s.v.donScandal >= 72,
+      text: (s) => '世論に押され、権藤 嘉平が議員を辞める。会見で頭を下げたのは一度だけだった。派閥の会長の座をめぐって、古参の葛城 恒雄と、改革派の若手リーダー御堂 隆一が争う。' +
+        (s.flags.donDebt ? 'ドンからは短い電話があった。「借りは、葛城を推すことで返してもらう」。' : ''),
+      choices: [
+        { label: '葛城に付く', hist: true, note: 'しがらみ↑ 求心力↑（派閥内） 仁科の忠誠↑／派閥は保守派が握る。党は割れにくい',
+          effect: (g) => { const s = g.s; s.don.status = 'resigned'; s.flags.katsuragi = true; g.add('tie', 8); g.add('lead', 6); g.add('nishina', 10); g.add('image', -5); g.add('reform', 6); if (s.flags.donDebt) { s.flags.debtPaid = true; g.add('donRel', 10); } } },
+        { label: '御堂に付く', note: '党の支持率↑ 改革派の評価↑ 古参からの評価↓／派閥が割れる。党が割れる確率が上がる',
+          effect: (g) => { const s = g.s; s.don.status = 'resigned'; s.flags.mido = true; g.add('party', 2); g.add('image', 10); g.add('nishina', -5); g.add('reform', 8);
+            if (s.flags.donDebt) { g.add('donRel', -20); g.add('tie', 6); g.log('ドンへの借りを踏み倒した。権藤派の古参が冷たくなった', 'bad'); } } },
+        { label: '自ら跡目に名乗りを上げる（金40億）', req: (s) => s.v.lead < 58 ? '求心力が足りない（58以上が必要）' : (s.v.money < 40 ? '金が足りない' : null), div: 8,
+          note: '求心力と改革派の評価しだいで成否が分かれる。成功すれば派閥の会長（第1章の最大の出世）、失敗すれば求心力↓↓',
+          effect: (g) => { const s = g.s; s.don.status = 'resigned'; g.add('money', -40);
+            if (s.v.lead + s.v.image * 0.4 + (s.v.nishina >= 60 ? 6 : 0) >= 80) { s.flags.factionHead = true; g.add('lead', 15); g.add('tie', 6); g.log('派閥の会長に選ばれた。38歳の会長は派閥の歴史で初めてだ', 'delayed'); }
+            else { g.add('lead', -15); g.add('donRel', -10); g.log('名乗りは数が足りずに潰れた。「若すぎる」と笑われた', 'bad'); } } }
+      ]
+    },
+    {
+      id: 'e116', title: 'E1-16 父の死の夜の真相', once: true, priority: 61,
+      when: (s) => (s.don.status === 'resigned' && s.t - s.last.e111 >= 2) || (s.don.status === 'active' && s.t >= 25),
+      text: (s) => {
+        const heard = s.v.nishina >= 50;
+        const base = heard
+          ? '仁科が、ようやく口を開く。「先生。お父上が倒れた夜、赤坂の料亭でお会いになっていたのは、権藤先生です。お父上は、あの手帳のとおり、銀行の傷を今のうちに表に出そうと頼んでおられた。権藤先生は首を縦に振らなかった。お父上は、その帰りの車で倒れられたのです」。'
+          : '週刊誌の見出しに父の名前がある。「故・真壁龍三郎、死の直前に権藤氏と密談」。記事は、父が不良債権の早期処理を持ちかけ、ドンが拒んだと書いている。仁科は何も言わなかった。';
+        return base + (s.flags.persuadeFailed ? '屋敷でドンが漏らした「あの夜」の意味が、今わかる。' : '');
+      },
+      choices: [
+        { label: (s) => s.don.status === 'arrested' ? 'ドンに面会し、問いただす' : 'ドンに問いただす', note: (s) => s.don.status === 'arrested' ? '本音を聞くだけ' : 'ドンとの関係が残っていれば、ドンは父に詫び、反対をやめる。関係が冷えていれば、口止めの取引を持ちかけられる（受ける：金↑ しがらみ↑）',
+          effect: (g) => { magazine(g); const s = g.s; s.flags.asked = true;
+            if (s.don.status === 'arrested') { g.log('面会室のドンは小さく見えた。「龍三郎が正しかった。言えるのはそれだけだ」', 'delayed'); return; }
+            if (s.v.donRel >= 45) { s.don.stance = 'neutral'; g.add('donRel', 5); g.log('ドンは長く黙ってから言った。「あいつに詫びる。銀行の件は、もう止めん」', 'delayed'); }
+            else { g.add('money', 30); g.add('tie', 10); s.flags.hush = true; g.log('ドンは封筒を差し出した。「昔の話だ。墓まで持っていけ」。受け取った', 'bad'); } } },
+        { label: '胸にしまう', hist: true, note: '仁科の忠誠↑', effect: (g) => { magazine(g); g.add('nishina', 10); } },
+        { label: '公表する', req: (s) => s.v.nishina >= 50 ? null : '仁科から聞いていないので、裏付けがない', div: 6,
+          note: '党の支持率↑ 改革派の評価↑ 求心力↓↓（ドン派から） 仁科の忠誠↓／政治改革の世論が高まる',
+          effect: (g) => { const s = g.s; s.flags.publish = true; g.add('party', 3); g.add('image', 10); g.add('lead', -12); g.add('nishina', -10); g.add('reform', 12); g.add('donScandal', 10); g.add('donRel', -25); } }
+      ]
+    },
+    {
+      id: 'e112', title: 'E1-12 ドンの逮捕', once: true, priority: 60,
+      when: (s) => s.don.status === 'resigned' && s.t - s.last.e111 >= 3 &&
+        (s.flags.pursued || s.flags.publish || s.v.nishina <= 10 || s.v.party <= 42 || s.v.donScandal >= 88),
+      text: (s) => '権藤 嘉平が脱税の容疑で逮捕される。自宅の金庫から金の延べ棒が見つかったと、テレビが繰り返し流す。世論が激しく怒り、選挙制度と政治資金の「政治改革」を求める声が一気に高まる。' +
+        (s.flags.defended ? '献金疑惑のとき、あなたがドンを擁護した映像も流れている。' : ''),
+      choices: [
+        { label: '政治改革の法案を党内で推し進める', note: '党の支持率↑ 改革派の評価↑ 長老からの評価↓↓／党内で改革がまとまれば、党は割れにくい',
+          effect: (g) => { arrest(g); g.s.flags.reformInside = true; g.add('party', 4); g.add('image', 10); g.add('lead', -6); g.add('reform', -8); } },
+        { label: '党の結束を優先し、改革は先送りする', hist: true, note: '求心力↑（長老から） 党の支持率↓↓／党が割れる確率が上がる',
+          effect: (g) => { arrest(g); g.add('lead', 5); g.add('party', -6); g.add('image', -6); g.add('reform', 6); } },
+        { label: '（何もしない）', note: '党の支持率↓', effect: (g) => { arrest(g); g.add('party', -3); } }
+      ]
+    },
+    {
+      id: 'shadow', title: 'E1-12 ドンの院政', once: true, priority: 59,
+      when: (s) => s.don.status === 'resigned' && s.t - s.last.e111 >= 4 && s.last.e112 === undefined,
+      text: '検察は動かなかった。議員を辞めた権藤 嘉平は、目白の屋敷から派閥を動かし続ける。「辞めたのは議員だけだ」。政治改革の声は、少しずつ萎んでいく。',
+      choices: [
+        { label: '院政を受け入れ、ドンの後ろ盾を得る', note: '金↑ しがらみ↑↑ 求心力↑ ドンとの関係↑',
+          effect: (g) => { g.s.don.status = 'shadow'; g.add('money', 30); g.add('tie', 12); g.add('lead', 5); g.add('donRel', 10); g.add('reform', -10); g.add('image', -6); } },
+        { label: '院政から距離を置く', note: 'ドンとの関係↓ 改革派の評価↑',
+          effect: (g) => { g.s.don.status = 'shadow'; g.add('donRel', -10); g.add('image', 5); g.add('reform', -6); } }
+      ]
+    },
+    {
+      id: 'nishinaLeaves', title: '仁科の辞表', once: true, priority: 64,
+      when: (s) => s.v.nishina <= 25,
+      text: '朝、机の上に仁科の辞表が置いてある。「お父上への御恩は、もう返し終えたと思っております」。地元の後援会長たちが、仁科の顔で集まっていたことを、あなたは知っている。',
+      choices: [
+        { label: '地元まで追いかけ、頭を下げて引き止める', note: '仁科の忠誠↑ 求心力↓（小）', req: (s) => s.v.money < 10 ? '金が足りない' : null,
+          effect: (g) => { g.add('nishina', 20); g.add('lead', -2); g.add('money', -10); } },
+        { label: '辞表を受け取る', note: '地元の支持↓↓ 資金↓／仁科からの知らせが届かなくなる',
+          effect: (g) => { g.s.flags.nishinaGone = true; g.add('local', -10); g.add('funding', -8); } }
       ]
     },
 
     // ---- 章の終わり ----
     {
+      id: 'e113', title: 'E1-13 内閣不信任案', once: true, priority: 90,
+      when: (s) => s.t >= 26 && splitPressure(s) >= 15,
+      text: (s) => '野党が内閣不信任案を出す。与党の中から「政治改革を先送りする内閣は信任できない」という声が上がり、御堂 隆一が造反を口にし始めた。' +
+        (splitPressure(s) >= 35 ? '造反の数は、可決に届きそうだ。' : '可決に届くかどうかは、まだ分からない。あなたの一票と、あなたが連れていける議員の数が、党の行方を左右する。'),
+      choices: [
+        { label: '不信任案に反対し、党に残る', hist: true, note: '求心力↑（党内）',
+          effect: (g) => { g.add('lead', 4); settleSplit(g, 0); } },
+        { label: '不信任案に賛成し、離党して新党を作る（金40億）', req: (s) => s.v.money < 40 ? '金が足りない' : null, div: 12,
+          note: '党首になる。金と人を大量に使う。選挙は改革派の評価と地元の支持で戦う',
+          effect: (g) => { g.add('money', -40); g.s.flags.newParty = true; settleSplit(g, g.s.v.lead * 0.35 + 6); } },
+        { label: '採決を欠席する', note: '両方から信用されない（求心力↓）',
+          effect: (g) => { g.add('lead', -6); settleSplit(g, 0); } }
+      ]
+    },
+    {
       id: 'election', title: 'E1-14 衆議院選挙（1993年7月）', once: true, priority: 100,
       when: (s) => s.t >= 27,
-      text: '選挙の費用は約60億円。ここまでの判断が、地元の支持と党の支持率と資金に現れる。',
+      text: (s) => (s.flags.partySplit ? '不信任案が可決され、解散。党が割れたままの選挙になる。' : '党は一体のまま、選挙を迎える。') +
+        '選挙の費用は約60億円。ここまでの判断が、地元の支持と党の支持率と資金に現れる。',
       choices: [
         { label: '地元に張り付き、選挙区に集中する', effect: (g) => { g.add('local', 5); finishElection(g); } },
         { label: '全国の応援に回り、党の議席を守る', effect: (g) => { g.add('local', -6); g.add('party', 3); finishElection(g); } },
@@ -195,22 +352,55 @@
     }
   ];
 
+  // 父の死の夜を週刊誌で知った場合は、父の名前が出る
+  function magazine(g) {
+    if (g.s.v.nishina >= 50) return;
+    g.add('scandal', 6); g.add('local', -4); g.log('父の名前が週刊誌に出た。地元の後援会がざわついている', 'bad');
+  }
+
+  // ドンの逮捕。巻き込まれ方は、E1-07の選択と裏金で決まる
+  function arrest(g) {
+    const s = g.s; s.don.status = 'arrested'; s.don.stance = 'neutral';
+    g.add('reform', 25);
+    let hit = 0;
+    if (s.flags.defended) hit = 12 + (s.flags.blackfund || s.flags.hush ? 10 : 0);
+    else if (s.flags.distanced) hit = s.flags.blackfund || s.flags.hush ? 10 : 4;
+    if (s.flags.blackmail) hit += 6;
+    if (hit) { g.add('scandal', hit); g.log('捜査の過程で、あなたの名前も報じられた', 'bad'); }
+    if (s.flags.pursued) { g.add('party', 3); g.add('lead', -4); }
+  }
+
+  // 党が割れる圧力（W-11の簡易版）
+  function splitPressure(s) {
+    const f = s.flags, v = s.v;
+    return v.reform * 0.5 + Math.max(0, 50 - v.party) * 0.8 + (f.mido ? 10 : 0) - (f.katsuragi ? 8 : 0) - (f.reformInside ? 15 : 0) +
+      (f.publish ? 8 : 0) + (s.don.status === 'arrested' ? 6 : 0) - (s.don.status === 'shadow' ? 6 : 0);
+  }
+  function settleSplit(g, push) {
+    const s = g.s; const p = splitPressure(s) + push;
+    if (p >= 35) { s.flags.partySplit = true; g.add('party', -8); g.log('不信任案が可決された。造反組が離党し、党が割れた', 'bad'); }
+    else { g.log('不信任案は否決された。党は一体のまま選挙へ向かう', 'delayed'); if (s.flags.newParty) { g.add('lead', -8); g.log('造反は数が足りなかった。少数の新党で戦うことになる', 'bad'); } }
+  }
+
   function finishElection(g) {
     const s = g.s, v = s.v;
     v.money -= 60;
     if (v.money < 0) { v.local += v.money * 0.3; v.money = 0; g.log('資金が足りず、選挙運動が細った', 'bad'); }
-    const exposed = s.flags.blackfund && v.scandal >= 33;
-    const score = v.local + (v.party - 50) * 0.3 - Math.max(0, v.scandal - 33) * 0.4 - (exposed ? 8 : 0);
-    s.result = {
-      score: Math.round(score),
-      won: score >= 40,
-      exposed: !!exposed,
-      partyResult: v.party >= 50 ? '与党が議席を守る' : (v.party >= 42 ? '与党が過半数をぎりぎり維持' : '与党が過半数を割る')
-    };
+    const exposed = (s.flags.blackfund || s.flags.hush) && v.scandal >= 30;
+    const base = s.flags.newParty
+      ? v.local * 0.85 + (v.image - 40) * 0.5 + (v.reform - 40) * 0.2 + (s.flags.partySplit ? 4 : -6)
+      : v.local + (v.party - 50) * 0.5 - (s.flags.partySplit ? 5 : 0) + (v.reform >= 55 && v.image < 30 ? -4 : 0);
+    const score = base - Math.max(0, v.scandal - 28) * 0.6 - (exposed ? 10 : 0);
+    let partyResult;
+    if (s.flags.partySplit) partyResult = v.party >= 46 ? '与党は割れたが、過半数をぎりぎり維持' : '与党が過半数を割り、政権交代へ';
+    else partyResult = v.party >= 48 ? '与党が議席を守る' : (v.party >= 42 ? '与党が過半数をぎりぎり維持' : '与党が過半数を割る');
+    if (s.flags.newParty) partyResult = '新党の党首として：' + partyResult;
+    s.result = { score: Math.round(score), won: score >= 45, exposed: !!exposed, partyResult };
+    if (exposed) g.log('裏の金の流れが選挙中に報じられた', 'bad');
     if (!s.result.won) s.over = 'lost';
   }
 
-  const api = { events, finishElection };
+  const api = { events, finishElection, splitPressure };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.REB_EVENTS = api;
 })(typeof window !== 'undefined' ? window : globalThis);
