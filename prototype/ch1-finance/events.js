@@ -4,6 +4,9 @@
 (function (root) {
   'use strict';
 
+  // 章に関係ない加点・減点イベント（items.js）。第1章のパラメーターで動くものを混ぜる
+  const ITEMS = (typeof module !== 'undefined' && module.exports) ? require('./items.js').items : root.REB_ITEMS.items;
+
   const donBlocks = (s) => s.don.stance === 'oppose' && (s.don.status === 'active' || s.don.status === 'shadow');
   const needLead = (n) => (s) => s.v.lead >= n ? null : '求心力が足りない（' + n + '以上が必要）';
   // 公的資金に必要な求心力：父の手帳などで下がり、ドンが反対していると上がる
@@ -39,7 +42,7 @@
       choices: [
         { label: '目標を受け入れる', hist: true, effect: (g) => { g.add('tech', -3); } },
         { label: '受け入れつつ、国内の研究開発に予算を付ける', note: '財政↓ 技術力↑（窓が開いている間の投資は効果が大きい）',
-          effect: (g) => { g.add('fiscal', -4); g.add('tech', 6); g.later(12, '半導体への投資が実り、景気を押し上げた', (h) => h.add('economy', 3)); } },
+          effect: (g) => { g.s.flags.semiR = true; g.add('fiscal', -4); g.add('tech', 6); g.later(12, '半導体への投資が実り、景気を押し上げた', (h) => h.add('economy', 3)); } },
         { label: '受け入れを拒む', note: '技術力↑ しかし報復で景気↓',
           effect: (g) => { g.add('tech', 2); g.later(4, '米国の報復関税で輸出が傷んだ', (h) => h.add('economy', -4)); } }
       ]
@@ -549,6 +552,8 @@
     if (exposed) g.log('裏の金の流れが選挙中に報じられた', 'bad');
     if (!s.result.won) s.over = 'lost';
   }
+
+  events.push.apply(events, ITEMS);
 
   const api = { events, finishElection, splitPressure };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

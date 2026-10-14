@@ -27,6 +27,8 @@
 | `docs/events/consumption-tax.md` | 消費税の共通イベント（TX-1〜TX-5） |
 | `docs/events/open-issues.md` | 全章の未決事項の整理（決めたこと、ユーザーの決定、後で決めること） |
 | `docs/events/z10-alternate-history.md` | 「別の歴史」の独自イベント（ZA〜ZE） |
+| `docs/events/event-roles.md` | イベントの役割タグ（幹・加点・減点）の設計と、第1章への当てはめ |
+| `docs/events/event-items.md` | 章に関係ない加点15件・減点15件（ADD/SUB）、副次効果の案、整合チェック |
 | `docs/events/numbers-draft.md` | 数値の初期案（試作で調整する出発点） |
 | `prototype/ch1-finance/` | 第1章の金融と政局の試作（ブラウザで動く） |
 | `prototype/tools/` | 試作の共通の道具。自動プレイ（`sim.js`）、アーティファクトの組み立て（`build-artifact.js`）、画面の動作確認（`smoke.js`） |
