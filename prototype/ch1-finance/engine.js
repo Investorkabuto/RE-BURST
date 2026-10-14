@@ -59,6 +59,8 @@
         fiscal: 60,    // 財政（高いほど健全）
         spend: 0,      // 当初の予算を超えた歳出（兆円/年）。経済対策や投入で増え、少しずつ戻る
         life: 56,      // 暮らしの実感
+        birth: 50,     // 人口のゲージ（子育てのしやすさ。出生率に反映。ゆっくり動く）
+        burdenAdj: 0,  // 国民負担率の政策による上げ下げ（ポイント。増税・減税のイベントが動かす）
         tech: 50,      // 技術力
         // 隠れた値（画面には出さない。予兆から読み取る）
         damage: world.dmg0, // 金融の傷み
@@ -100,7 +102,18 @@
     const tax = 60 + (v.economy - 56) * 0.5;                     // 税収（兆円/年）
     const balance = -(6.5 - (v.economy - 56) * 0.3 + v.spend);   // 単年度の財政収支（兆円/年。赤字は国債で埋める）
     const cpi = Math.max(-1.5, (v.infl - 30) * 0.12 + 2.0);        // 物価上昇率（%）
-    return { growth, nikkei, bankrupt, unemp, tax, balance, cpi };
+    // 人口・暮らし・社会保障（表示用の換算。史実の統計とは一致させない）
+    const yr = s.t / 12;                                          // 1991年4月からの経過年
+    const pop = Math.round(12410 + yr * 30);                      // 総人口（万人）。この時期はまだ緩やかに増える
+    const aging = 12.6 + yr * 0.5;                                // 高齢化率（65歳以上の割合、%）
+    const tfr = 1.54 + (v.birth - 50) * 0.01;                     // 合計特殊出生率
+    const births = pop * 0.0098 * (tfr / 1.54) * (1 - yr * 0.006); // 出生数（万人/年）。1991年は約120万人
+    const ssec = 47 + yr * 2.4 + (aging - 12.6) * 0.8;            // 社会保障費（兆円/年）。高齢化で増える
+    const burden = 36.5 + yr * 0.3 + v.burdenAdj;                 // 国民負担率（%）。社会保険料が年々上がる
+    const salary = 460 + (v.economy - 56) * 1.5 + (v.life - 56) * 1.0; // 平均年収（万円）
+    const takehome = salary * (1 - burden * 0.0065);              // 手取り（万円/年）。負担率が上がると減る
+    const assets = Math.round(1700 + (nikkei - 31000) * 0.03 - (v.damage - 25) * 5 + yr * 30); // 家計の資産（兆円。株と土地の値段で動く）
+    return { growth, nikkei, bankrupt, unemp, tax, balance, cpi, pop, aging, tfr, births, ssec, burden, salary, takehome, assets };
   }
 
   // 語り部：大きな波乱のない月が続くほど、外からの衝撃が起きやすくなる（被害の大きさは備えで決まる）
@@ -194,6 +207,8 @@
       const lct = 52 + (v.economy - 50) * 0.5 + (v.party - 50) * 0.4;
       v.local = clamp(v.local + (lct - v.local) * 0.04, 0, 100);
       v.moral = v.moral * 0.99;
+      // 人口のゲージは、暮らしの実感に向かってごくゆっくり動く（効果は約20年かけて出る：L-2）
+      v.birth = clamp(v.birth + (50 + (v.life - 56) * 0.3 - v.birth) * 0.01, 0, 100);
       s.ind = indicators(s);
       rollShocks();
       s.hist.push({ t: s.t, economy: v.economy, damage: v.damage, fiscal: v.fiscal, party: v.party, life: v.life, aware: v.aware, ind: s.ind });
